@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>甲壳虫跑团打卡记录</title>
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            max-width: 600px;
+        }
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 2em auto;
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        th, td {
+            border: 1px solid #e0e0e0;
+            padding: 0.4em 0.8em;
+            text-align: center;
+        }
+        th {
+            background: linear-gradient(90deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+            font-weight: 600;
+            border-bottom: 2px solid #a8edea;
+        }
+        tr:nth-child(even) {background: #fafafa;}
+        tr:hover {background: #ffe0b2;}
+        table, th, td {
+            border-width: 1px;
+        }
+        table {
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    {% if error %}
+    <h2 style="text-align:center;color:red;">{{ error }}</h2>
+    {% endif %}
+    <h2 style="text-align:center;">{%if name%}{{name}} {%endif%}的甲壳虫跑团打卡记录</h2>
+
+    <table>
+        <tr>
+            <th>序号</th>
+            <th>日期</th>
+            <th>距离（km）</th>
+            <th>备注</th>
+        </tr>
+        {% if items %}
+        {% for item in items %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ item.date }}</td>
+            <td>{{ '%.2f'|format(item.distance) }}</td>
+            <td>{{ item.order }}</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+    </table>
+    {% if items and items|length > 0 %}
+    <div style="text-align:center;margin:1.5em 0;">
+        <div style="display:inline-block;background:#fff;padding:0.6em 1.5em;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            <span style="font-size:1.1em;">第 {{ page|default(1) }}/ {{ maxpage|default(1) }} 页</span>
+            {% if page > 1 %}
+                <a href="?user_id={{ user_id }}&page={{ page-1 }}&size={{ size }}" style="margin-left:1.5em;">上一页</a>
+            {% endif %}
+            <a href="?user_id={{ user_id }}&page={{ page+1 }}&size={{ size }}" style="margin-left:1.5em;">下一页</a>
+        </div>
+    </div>
+    {% endif %}
+</body>
+</html>

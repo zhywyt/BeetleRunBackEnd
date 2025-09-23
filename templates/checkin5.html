@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>打卡成功！</title>
+    <style>
+        body {
+            background: linear-gradient(120deg, #ffecd2 0%, #fcb69f 100%);
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 90vh;
+            margin: 0 auto;
+            width: 90vw;
+            max-width: 480px;
+            box-sizing: border-box;
+        }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(252,182,159,0.12);
+            padding: 2em 3em;
+            margin-top: 2em;
+            text-align: center;
+            max-width: 420px;
+            width: 90vw;
+            box-sizing: border-box;
+        }
+        .success {
+            font-size: 2.2em;
+            color: #fcb69f;
+            margin-bottom: 0.2em;
+            font-weight: bold;
+        }
+        .mileage {
+            display: inline-block;
+            margin-bottom: 0.7em;
+            padding: 0.2em 1.2em;
+            background: linear-gradient(90deg, #ffecd2 0%, #fcb69f 100%);
+            color: #fff;
+            font-size: 1.3em;
+            font-weight: 700;
+            border-radius: 999px;
+            box-shadow: 0 2px 8px rgba(252,182,159,0.12);
+            letter-spacing: 0.05em;
+        }
+        .emoji {
+            font-size: 3em;
+            margin-bottom: 0.3em;
+        }
+        .info {
+            color: #666;
+            margin-top: 1em;
+            font-size: 1.1em;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 2em;
+            padding: 0.6em 2em;
+            background: #fcb69f;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #ffecd2;
+            color: #fcb69f;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="emoji">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="24" cy="24" r="24" fill="#fcb69f"/>
+                <path d="M14 25.5L21 32.5L34 17.5" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="success">打卡成功！</div>
+        {% if mileage is defined %}
+        本次里程：<div class="mileage">{{ '%.2f'|format(mileage) }} km</div>
+        {% endif %}
+        <div class="info">
+            恭喜{{name}}完成了今日打卡！<br>
+            <span style="color:#fcb69f;">Keep Running！</span>
+        </div>
+        {% if stat %}
+        <div class="info" style="margin-top:1.5em;">
+            <b>本周统计：</b><br>
+            打卡次数：{{ stat["本周打卡次数"] }}<br>
+            距离：{{ "%.2f"|format(stat["本周距离"]) }} km
+        </div>
+        {% endif %}
+        <a href="/rank" class="btn">查看排行榜</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>甲壳虫跑团打卡排行榜</title>
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            max-width: 600px;
+        }
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 2em auto;
+            /* min-width: 50vw; */
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        th, td {
+            border: 1px solid #e0e0e0;
+            padding: 0.4em 0.8em;
+            text-align: center;
+        }
+        th {
+            background: linear-gradient(90deg, #f6d365 0%, #fda085 100%);
+            color: #333;
+            font-weight: 600;
+            border-bottom: 2px solid #fda085;
+        }
+        tr:nth-child(even) {background: #fafafa;}
+        tr:hover {background: #ffe0b2;}
+        table, th, td {
+            border-width: 1px;
+        }
+        table {
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <h2 style="text-align:center;">甲壳虫跑团打卡排行榜 <span style="font-size:0.7em;color:#888;">（本周：{{ week_label }}）</span></h2>
+    <table>
+        <tr>
+            <th>排名</th>
+            <th>昵称</th>
+            <th>用户ID</th>
+            <th>打卡次数</th>
+            <th>本周距离（km）</th>
+        </tr>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.rank }}</td>
+            <td>{{ item.name }}</td>
+            <td>{{ item.user_id }}</td>
+            <td>{{ item.checkin_count }}</td>
+            <td>{{ "%.2f"|format(item.week_distance) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
