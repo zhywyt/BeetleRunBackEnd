@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>数据筛选查阅</title>
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 700px;
+            margin: 2em auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            padding: 2em 2.5em;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+        form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1em;
+            justify-content: center;
+            margin-bottom: 2em;
+        }
+        label {
+            font-weight: 500;
+            margin-right: 0.5em;
+        }
+        input, select {
+            padding: 0.4em 0.8em;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+        }
+        button {
+            padding: 0.5em 1.5em;
+            background: #a8edea;
+            color: #333;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #fed6e3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5em;
+        }
+        th, td {
+            border: 1px solid #e0e0e0;
+            padding: 0.4em 0.8em;
+            text-align: center;
+        }
+        th {
+            background: linear-gradient(90deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {background: #fafafa;}
+    </style>
+</head>
+<body>
+    <div style="text-align:center;margin-top:2em;">
+        <a href="/" style="margin:0 1em;">数据筛选</a>
+        <a href="/rank" style="margin:0 1em;">排行榜</a>
+        <a href="#" id="userStatLink" style="margin:0 1em;">用户统计</a>
+        <a href="#" id="userListLink" style="margin:0 1em;">打卡记录</a>
+    </div>
+    <div class="container">
+        <h2>数据库数据筛选查阅</h2>
+        <form id="filterForm">
+            <label>用户ID: <input type="text" name="user_id" /></label>
+            <label>姓名: <input type="text" name="name" /></label>
+            <label>最小距离: <input type="number" step="0.01" name="min_distance" /></label>
+            <label>最大距离: <input type="number" step="0.01" name="max_distance" /></label>
+            <button type="submit">筛选</button>
+        </form>
+        <table id="resultTable">
+            <thead>
+                <tr>
+                    <th>用户ID</th>
+                    <th>姓名</th>
+                    <th>日期</th>
+                    <th>距离(km)</th>
+                    <th>备注</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 数据行将由JS插入 -->
+            </tbody>
+        </table>
+    </div>
+    <script>
+        // 跳转用户统计和打卡记录时校验用户ID
+        document.getElementById('userStatLink').onclick = function(e) {
+            e.preventDefault();
+            var userId = document.querySelector('input[name="user_id"]').value.trim();
+            if(!userId) {
+                alert('请先填写用户ID！');
+                document.querySelector('input[name="user_id"]').focus();
+                return false;
+            }
+            window.location.href = '/stat?user_id=' + encodeURIComponent(userId);
+        };
+        document.getElementById('userListLink').onclick = function(e) {
+            e.preventDefault();
+            var userId = document.querySelector('input[name="user_id"]').value.trim();
+            if(!userId) {
+                alert('请先填写用户ID！');
+                document.querySelector('input[name="user_id"]').focus();
+                return false;
+            }
+            window.location.href = '/list?user_id=' + encodeURIComponent(userId) + '&page=1&size=10';
+        };
+        document.getElementById('filterForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                user_id: form.user_id.value,
+                name: form.name.value,
+                min_distance: form.min_distance.value,
+                max_distance: form.max_distance.value
+            };
+            // 移除空值
+            Object.keys(data).forEach(k => { if(data[k] === '') delete data[k]; });
+            const res = await fetch('/web', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            const tbody = document.querySelector('#resultTable tbody');
+            tbody.innerHTML = '';
+            if(result && result.items && result.items.length > 0) {
+                result.items.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${item.user_id}</td><td>${item.name||''}</td><td>${item.date}</td><td>${item.distance}</td><td>${item.order||''}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5">无数据</td></tr>';
+            }
+        });
+    </script>
+</body>
+</html>

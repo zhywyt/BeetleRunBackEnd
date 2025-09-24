@@ -84,8 +84,9 @@
         </div>
         <div class="success">打卡成功！</div>
         {% if mileage is defined %}
-        本次里程：<div class="mileage">{{ '%.2f'|format(mileage) }} km</div>
+        本次里程：<div class="mileage">{{ '%.3f'|format(mileage) }} km</div>
         {% endif %}
+        {% if message %} {{message}} {% endif %}
         <div class="info">
             恭喜{{name}}完成了今日打卡！<br>
             <span style="color:#f7971e;">Keep Running！</span>
@@ -94,7 +95,7 @@
         <div class="info" style="margin-top:1.5em;">
             <b>本周统计：</b><br>
             打卡次数：{{ stat["本周打卡次数"] }}<br>
-            距离：{{ "%.2f"|format(stat["本周距离"]) }} km
+            距离：{{ "%.3f"|format(stat["本周距离"]) }} km
         </div>
         {% endif %}
         <a href="/rank" class="btn">查看排行榜</a>

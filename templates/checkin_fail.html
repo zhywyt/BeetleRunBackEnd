@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>打卡失败</title>
+    <style>
+        body {
+            background: linear-gradient(120deg, #f7971e 0%, #ffd200 100%);
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 90vh;
+            max-width: 480px;
+            margin: 0;
+        }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(247,151,30,0.12);
+            padding: 2.5em 3em 2em 3em;
+            margin-top: 2em;
+            text-align: center;
+            max-width: 420px;
+            width: 90vw;
+            box-sizing: border-box;
+        }
+        .fail {
+            margin: 0 auto 1.2em auto;
+            display: flex;
+            justify-content: center;
+        }
+        .info {
+            font-size: 1.2em;
+            color: #e53935;
+            margin-bottom: 1em;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 1.5em;
+            padding: 0.6em 2em;
+            background: #f7971e;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #ffd200;
+            color: #f7971e;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="fail">
+            <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="40" cy="40" r="36" fill="#ffd200" stroke="#f7971e" stroke-width="4"/>
+                <line x1="28" y1="28" x2="52" y2="52" stroke="#e53935" stroke-width="5" stroke-linecap="round"/>
+                <line x1="52" y1="28" x2="28" y2="52" stroke="#e53935" stroke-width="5" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <div class="info">
+            打卡失败！<br>
+            {% if error %}{{ error }}{% else %}请稍后重试。{% endif %}
+        </div>
+        <a href="/" class="btn">返回首页</a>
+    </div>
+</body>
+</html>

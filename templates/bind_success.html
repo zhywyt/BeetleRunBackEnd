@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>绑定成功</title>
+    <style>
+        body {
+            background: linear-gradient(120deg, #fffde4 0%, #f9d423 100%);
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            max-width: 480px;
+            min-height: 90vh;
+            margin: 0;
+        }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(249,212,35,0.12);
+            padding: 2.5em 3em 2em 3em;
+            margin-top: 2em;
+            text-align: center;
+            max-width: 420px;
+            width: 90vw;
+            box-sizing: border-box;
+        }
+        .star {
+            margin: 0 auto 1.2em auto;
+            display: flex;
+            justify-content: center;
+        }
+        .info {
+            font-size: 1.2em;
+            color: #f9a602;
+            margin-bottom: 1em;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 1.5em;
+            padding: 0.6em 2em;
+            background: #f9d423;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #fffde4;
+            color: #f9a602;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="star">
+            <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M40 13
+                    L48.51 29.02
+                    A4 4 0 0 0 52.13 31.23
+                    L70.09 33.63
+                    A3 3 0 0 1 71.36 39.13
+                    L57.13 51.13
+                    A4 4 0 0 0 55.89 55.23
+                    L60.18 72.02
+                    A3 3 0 0 1 55.67 75.13
+                    L40 65.77
+                    L24.33 75.13
+                    A3 3 0 0 1 19.82 72.02
+                    L24.11 55.23
+                    A4 4 0 0 0 22.87 51.13
+                    L8.64 39.13
+                    A3 3 0 0 1 9.91 33.63
+                    L27.87 31.23
+                    A4 4 0 0 0 31.49 29.02
+                    Z"
+                    fill="#FFD600" stroke="#F9A602" stroke-width="2" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="info">
+            绑定成功！<br>
+            用户名：{{ name }}<br>
+            用户ID：{{ user_id }}<br>
+            当前已绑定总人数：{{ count }}
+        </div>
+        <a href="/" class="btn">返回首页</a>
+    </div>
+</body>
+</html>

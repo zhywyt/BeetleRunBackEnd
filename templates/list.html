@@ -37,6 +37,28 @@
         table {
             border: none;
         }
+        .btn, button {
+            display: inline-block;
+            margin-top: 1.5em;
+            padding: 0.6em 2em;
+            background: #6a82fb;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn:hover, button:hover:enabled {
+            background: #3a47d5;
+            color: #fff;
+        }
+        button:disabled {
+            background: #e0e0e0;
+            color: #aaa;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -44,6 +66,7 @@
     <h2 style="text-align:center;color:red;">{{ error }}</h2>
     {% endif %}
     <h2 style="text-align:center;">{%if name%}{{name}} {%endif%}的甲壳虫跑团打卡记录</h2>
+    <h3 style="text-align:center;">{%if user_id  %} 所属账号： {{ user_id }} {%endif%}</h3>
 
     <table>
         <tr>
@@ -55,7 +78,7 @@
         {% if items %}
         {% for item in items %}
         <tr>
-            <td>{{ loop.index }}</td>
+            <td>{{ loop.index + (page - 1) * size }}</td>
             <td>{{ item.date }}</td>
             <td>{{ '%.2f'|format(item.distance) }}</td>
             <td>{{ item.order }}</td>
@@ -67,12 +90,13 @@
     <div style="text-align:center;margin:1.5em 0;">
         <div style="display:inline-block;background:#fff;padding:0.6em 1.5em;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
             <span style="font-size:1.1em;">第 {{ page|default(1) }}/ {{ maxpage|default(1) }} 页</span>
-            {% if page > 1 %}
-                <a href="?user_id={{ user_id }}&page={{ page-1 }}&size={{ size }}" style="margin-left:1.5em;">上一页</a>
-            {% endif %}
-            <a href="?user_id={{ user_id }}&page={{ page+1 }}&size={{ size }}" style="margin-left:1.5em;">下一页</a>
+            <button onclick="location.href='?user_id={{ user_id }}&page={{ page-1 }}&size={{ size }}'" {% if page <= 1 %}disabled{% endif %} style="margin-left:1.5em;">上一页</button>
+            <button onclick="location.href='?user_id={{ user_id }}&page={{ page+1 }}&size={{ size }}'" {% if page >= maxpage %}disabled{% endif %} style="margin-left:1.5em;">下一页</button>
         </div>
     </div>
     {% endif %}
+    <div style="text-align:center;margin:1.5em 0;">
+        <a href="/" class="btn">返回首页</a>
+    </div>
 </body>
 </html>

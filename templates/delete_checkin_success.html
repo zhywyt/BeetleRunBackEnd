@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>打卡记录删除成功</title>
+    <style>
+        body {
+            background: linear-gradient(120deg, #f7971e 0%, #ffd200 100%);
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(247,151,30,0.12);
+            padding: 2.5em 3em 2em 3em;
+            margin-top: 2em;
+            text-align: center;
+            max-width: 520px;
+            width: 90vw;
+            box-sizing: border-box;
+        }
+        .success {
+            font-size: 1.5em;
+            color: #f7971e;
+            margin-bottom: 1em;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0 0 0;
+        }
+        th, td {
+            border: 1px solid #ffd200;
+            padding: 0.5em 0.8em;
+            text-align: center;
+        }
+        th {
+            background: #fffde4;
+            color: #f7971e;
+            font-weight: 600;
+        }
+        tr.deleted-row {
+            background: #fff9c4;
+            font-weight: bold;
+            color: #e65100;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 1.5em;
+            padding: 0.6em 2em;
+            background: #f7971e;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #ffd200;
+            color: #f7971e;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="success">{{ message }}</div>
+        {% if deleted_data and deleted_data|length > 0 %}
+        <table>
+            <thead>
+                <tr>
+                    <th>日期</th>
+                    <th>距离(km)</th>
+                    <th>备注</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in deleted_data %}
+                <tr class="deleted-row">
+                    <td>{{ item.date }}</td>
+                    <td>{{ '%.2f'|format(item.distance) }}</td>
+                    <td>{{ item.order }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="color:#e65100;">未找到任何可删除的打卡记录。</div>
+        {% endif %}
+        <a href="/" class="btn">返回首页</a>
+    </div>
+</body>
+</html>

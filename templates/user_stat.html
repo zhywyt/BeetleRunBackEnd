@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>用户统计信息</title>
+    <style>
+        body {
+            background: linear-gradient(120deg, #a8edea 0%, #fed6e3 100%);
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 90vh;
+            margin: 0 auto;
+            width: 90vw;
+            max-width: 480px;
+            box-sizing: border-box;
+        }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(168,237,234,0.12);
+            padding: 2em 3em;
+            margin-top: 2em;
+            text-align: center;
+            max-width: 420px;
+            width: 90vw;
+            box-sizing: border-box;
+        }
+        .stat {
+            font-size: 1.2em;
+            margin: 1em 0;
+            color: #333;
+        }
+        .error {
+            color: #e53935;
+            font-weight: bold;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 1.5em;
+            padding: 0.6em 2em;
+            background: #a8edea;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #fed6e3;
+            color: #a8edea;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>{%if name %}{{ name }} 的用户统计信息</h2>
+        <span style="font-size:1.5em;color:#888;">（本周：{{ week_label }}）{% endif %}</span>
+        <h3>{%if user_id  %} 所属账号： {{ user_id }} {%endif%}</h3>
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% elif stat %}
+            <div class="stat">总计打卡次数：{{ stat["总计打卡次数"] }}</div>
+            <div class="stat">本周打卡次数：{{ stat["本周打卡次数"] }}</div>
+            <div class="stat">总距离：{{ '%.2f'|format(stat["总距离"]) }} km</div>
+            <div class="stat">本周距离：{{ '%.2f'|format(stat["本周距离"]) }} km</div>
+        {% endif %}
+        <a href="/" class="btn">返回首页</a>
+    </div>
+</body>
+</html>
