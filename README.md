@@ -7,12 +7,12 @@ pip install fastapi sqlmodel
 
 ## Register with systemd
 ```bash
-sudo ln -s ${pwd}/beetRunBk.service /etc/systemd/system/beetRunBk.service
+sudo ln -s ${pwd}/beetleRunBk.service /etc/systemd/system/beetleRunBk.service
 sudo systemctl daemon-reload
-sudo systemctl enable beetRunBk
-sudo systemctl start beetRunBk
+sudo systemctl enable beetleRunBk
+sudo systemctl start beetleRunBk
 # check the status
-sudo systemctl status beetRunBk
+sudo systemctl status beetleRunBk
 ```
 
 ## blockly plugin
