@@ -24,7 +24,7 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="/root/beetleRunBk/static"), name="static")
 engine = create_engine("sqlite:///test.db")
 templates = Jinja2Templates(directory="templates")
-
+date_format = "%Y-%m-%d %H:%M:%S"
 class User(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True) # used by system
     user_id: int                                    # 
@@ -75,8 +75,8 @@ def get_current_total_range() -> str:
         checkins = results.all()
         if not checkins:
             return "无数据"
-        start_date = datetime.strptime(checkins[0].date, "%Y-%m-%d %H:%M:%S")
-        end_date = datetime.strptime(checkins[-1].date, "%Y-%m-%d %H:%M:%S")
+        start_date = datetime.strptime(checkins[0].date, date_format)
+        end_date = datetime.strptime(checkins[-1].date, date_format)
         total_label = f"{start_date.year}.{start_date.month}.{start_date.day}-{end_date.year}.{end_date.month}.{end_date.day}"
         return total_label
 def get_today_checkin_users()-> list[int]:
@@ -87,12 +87,15 @@ def get_today_checkin_users()-> list[int]:
     with Session(engine) as session:
         now = datetime.now()
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        statement = select(CheckIn).where(CheckIn.date >= start_of_day.strftime("%Y-%m-%d %H:%M:%S"))
+        statement = select(CheckIn).where(CheckIn.date >= start_of_day.strftime(date_format))
         results = session.exec(statement)
         today_checkins = results.all()
         user_ids = list(set([c.user_id for c in today_checkins]))
         return user_ids
-def get_statistics(user_id: int):
+def get_statistics(user_id: int)-> dict:
+    '''
+    return the statistics of user_id
+    '''
     import datetime
     from datetime import datetime, timedelta
     with Session(engine) as session:
@@ -104,14 +107,17 @@ def get_statistics(user_id: int):
         now = datetime.now()
         start_of_week = now - timedelta(days=now.weekday())
         # 统计本周打卡数
-        week_checkins = [c for c in checkins if datetime.strptime(c.date, "%Y-%m-%d %H:%M:%S") >= start_of_week]
+        week_checkins = [c for c in checkins if datetime.strptime(c.date, date_format) >= start_of_week]
         return {
             "总计打卡次数": len(checkins),
             "本周打卡次数": len(week_checkins),
             "总距离": total_distance,
             "本周距离": sum(c.distance for c in week_checkins)
         }
-def is_binded(user_id: int):
+def is_binded(user_id: int)->bool:
+    '''
+    check if the user_id is binded
+    '''
     with Session(engine) as session:
         statement = select(User).where(User.user_id == user_id)
         results = session.exec(statement)
@@ -120,6 +126,9 @@ def is_binded(user_id: int):
 
 @app.post("/web")
 async def web_query(data: dict):
+    '''
+    api for query the databse
+    '''
     user_id = data.get("user_id")
     name = data.get("name")
     min_distance = data.get("min_distance")
@@ -163,6 +172,9 @@ async def web_query(data: dict):
     return JSONResponse(content={"items": result})
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
+    '''
+    page for root
+    '''
     return templates.TemplateResponse("web.html", {"request": request})
 async def get_user_stat_(user_id, request):
     error = None
@@ -188,14 +200,26 @@ async def get_user_stat_(user_id, request):
     })
 @app.post("/stat", response_class=HTMLResponse)
 async def get_user_stat(data: dict, request: Request):
+    '''
+    return the user statistic page
+    data: {"user_id": 123456}
+    '''
     user_id = data.get("user_id")
     return await get_user_stat_(user_id, request)
 @app.get("/stat", response_class=HTMLResponse)
 async def get_user_stat_get(request: Request):
+    '''
+    return the user statistic page
+    query user_id: ?user_id=123456
+    '''
     user_id = request.query_params.get("user_id")
     return await get_user_stat_(user_id, request)
 @app.post("/bind", response_class=HTMLResponse)
 async def bind_user(data: BindInfo, request: Request):
+    '''
+    bind the user_id with name
+    data: {"user_id": 123456, "name": "zhywyt"}
+    '''
     name = data.name
     user_id = data.user_id
     # 检查名字，要求为：中文英文数字组合，不多于二十个字符
@@ -231,9 +255,15 @@ async def bind_user(data: BindInfo, request: Request):
         "count": count
     })
 @app.post("/checkin", response_class=HTMLResponse)
-async def check_in(data: dict, request: Request):
+async def check_in(data: dict, request: Request)-> HTMLResponse:
+    '''
+    checkin api
+    will parse the distance if not float, support format same as: 5.08km 5.08公里 21.095千米 5000m 5000米 3.1英里 3.5mile 3.8miles
+    data: {"message_id": 123456, "user_id": 123456, "order": "打卡 10", "distance": 5.08}
+    '''
     error = None
     message = None
+    date_format = "%Y-%m-%d %H:%M:%S"
     if type(data.get("distance")) != float:
         # try to parse 5.08km 5.08公里
         scale = 1
@@ -266,6 +296,10 @@ async def check_in(data: dict, request: Request):
             "stat": None,
             "error": f"{checkin.user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。"
         })
+    # check the date if is not UTC+8, convert it to UTC+8
+    dt = datetime.strptime(checkin.date, date_format)
+    dt = dt + timedelta(hours=8)
+    checkin.date = dt.strftime(date_format)
     # 检查今天是否打过卡了
     checked_users = get_today_checkin_users()
     # 检查今天已经打的人数
@@ -275,7 +309,7 @@ async def check_in(data: dict, request: Request):
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
         statement = select(CheckIn).where(
             (CheckIn.user_id == checkin.user_id) &
-            (CheckIn.date >= start_of_day.strftime("%Y-%m-%d %H:%M:%S"))
+            (CheckIn.date >= start_of_day.strftime(date_format))
         )
         results = session.exec(statement)
         today_checkins = results.all()
@@ -308,7 +342,10 @@ async def check_in(data: dict, request: Request):
             "css_style_path": chosen_css,
             "stat": stat,
         })
-async def list_checkins_(user_id, page, size, request):
+async def list_checkins_(user_id, page, size, request)-> HTMLResponse:
+    '''
+    list the checkins of user_id with pagination
+    '''
     try:
         page = int(page)
         size = int(size)
@@ -356,51 +393,59 @@ async def list_checkins_(user_id, page, size, request):
         "error": f"{user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。"
     })
 @app.post("/list", response_class=HTMLResponse)
-async def list_checkins(data: dict, request: Request):
-    # data: {"user_id": 123456, "page": 1, "size": 10}
+async def list_checkins(data: dict, request: Request)->HTMLResponse:
+    '''
+    list post api
+    data: {"user_id": 123456, "page": 1, "size": 10}
+    '''
     user_id = data.get("user_id")
     page = data.get("page", 1)
     size = data.get("size", 10)
     return await list_checkins_(user_id, page, size, request)
 @app.get("/list", response_class=HTMLResponse)
 async def list_checkins_get(request: Request):
-    # query user_id: ?user_id=123456&page=1&size=10
+    '''
+    list get api
+    query user_id: ?user_id=123456&page=1&size=10
+    '''
     user_id = request.query_params.get("user_id")
     page = request.query_params.get("page", 1)
     size = request.query_params.get("size", 10)
     return await list_checkins_(user_id, page, size, request)
 @app.get("/rank", response_class=HTMLResponse)
 async def get_rank(request: Request):
+    '''
+    rank get api
+    get the top 10 users by total distance
+    '''
     with Session(engine) as session:
-        # 查询所有用户的总距离
-        user_dist = {}
-        user_checkin_count = {}
-        for row in session.exec(select(CheckIn.user_id, CheckIn.distance)):
-            uid = row.user_id
-            user_dist[uid] = user_dist.get(uid, 0) + row.distance
-            user_checkin_count[uid] = user_checkin_count.get(uid, 0) + 1
-        # 查询所有用户姓名
-        user_name_map = {u.user_id: u.name for u in session.exec(select(User))}
-        # 排序
-        sorted_users = sorted(user_dist.items(), key=lambda x: x[1], reverse=True)
+        rank_data = {}
         from datetime import datetime, timedelta
         now = datetime.now()
         start_of_week = now - timedelta(days=now.weekday())
+        # search all id to name map
+        for row in session.exec(select(CheckIn).where(
+            (CheckIn.date >= start_of_week.strftime(date_format)))
+        ).all():
+            if row.user_id not in rank_data:
+                temp_data = {}
+                temp_data["uid"] = row.user_id
+                temp_data["dist"] = row.distance
+                temp_data["name"] = session.exec(select(User).where(User.user_id == row.user_id)).first().name
+                temp_data["checkin_count"] = 1
+                rank_data[row.user_id] = temp_data
+            else:
+                rank_data[row.user_id]["dist"] += row.distance
+                rank_data[row.user_id]["checkin_count"] += 1
+        # sorted by week_distance
+        rank_data = sorted(rank_data.values(), key=lambda x: x["dist"], reverse=True)[:10]
         rank_list = []
-        for idx, (user_id, total_distance) in enumerate(sorted_users, 1):
-            # 查询该用户本周所有打卡
-            week_statement = select(CheckIn).where(
-                (CheckIn.user_id == user_id) &
-                (CheckIn.date >= start_of_week.strftime("%Y-%m-%d %H:%M:%S"))
-            )
-            week_checkins = session.exec(week_statement).all()
-            week_distance = sum(c.distance for c in week_checkins)
+        for idx, data in enumerate(rank_data, 1):
             rank_list.append({
-                "user_id": user_id,
-                "name": user_name_map.get(user_id, ""),
-                "checkin_count": user_checkin_count.get(user_id, 0),
-                "week_distance": week_distance,
-                "total_distance": total_distance,
+                "user_id": data.get("uid", 0),
+                "name": data.get("name", ""),
+                "checkin_count": data.get("checkin_count", 0),
+                "week_distance": data.get("dist", 0),
                 "rank": idx
             })
         return templates.TemplateResponse("rank.html", {
@@ -410,8 +455,10 @@ async def get_rank(request: Request):
         })
 @app.post("/rank", response_class=HTMLResponse)
 async def post_rank(data:dict, request: Request):
-    # this api for admin, will pick all data but not front of 10
-    # data: {"mode" : "total" or "month" or "week"}
+    '''
+    this api for admin, will pick all data but not front of 10
+    data: {"mode" : "total" or "month" or "week"}
+    '''
     mode = data.get("mode", "month")
     if mode not in ["total", "month", "week"]:
         mode = "month"
@@ -439,7 +486,7 @@ async def post_rank(data:dict, request: Request):
                 # 查询该用户本周所有打卡
                 week_statement = select(CheckIn).where(
                     (CheckIn.user_id == user_id) &
-                    (CheckIn.date >= start_of_week.strftime("%Y-%m-%d %H:%M:%S"))
+                    (CheckIn.date >= start_of_week.strftime(date_format))
                 )
                 week_checkins = session.exec(week_statement).all()
                 week_distance = sum(c.distance for c in week_checkins)
@@ -459,7 +506,7 @@ async def post_rank(data:dict, request: Request):
             for idx, (user_id, total_distance) in enumerate(sorted_users, 1):
                 month_statement = select(CheckIn).where(
                     (CheckIn.user_id == user_id) &
-                    (CheckIn.date >= start_of_month.strftime("%Y-%m-%d %H:%M:%S"))
+                    (CheckIn.date >= start_of_month.strftime(date_format))
                 )
                 month_checkins = session.exec(month_statement).all()
                 month_distance = sum(c.distance for c in month_checkins)
@@ -493,7 +540,10 @@ async def post_rank(data:dict, request: Request):
         })
 @app.post("/delete", response_class=HTMLResponse)
 async def delete_checkin(data: dict, request: Request):
-    # data: {"user_id":123456}
+    '''
+    delete all checkin data of user_id
+    data: {"user_id":123456}
+    '''
     user_id = data.get("user_id")
     if type(user_id) != int:
         try:
@@ -528,20 +578,46 @@ async def delete_checkin(data: dict, request: Request):
         })
 
         
-@app.post("/backup", response_class=HTMLResponse)
-async def backup_data(request: Request):
-    # backup database and clear current checkins 
-    # save the user and bindinfo table
+def backup_data_(request: Request, backup_name=None):
+    '''
+    only backup data do not clear checkin table
+    '''
     import os
     import shutil
     from datetime import datetime
-    from sqlmodel import text
     backup_dir = "backups"
     os.makedirs(backup_dir, exist_ok=True)
+    # there is not parse checkin.date need not date_format var
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = os.path.join(backup_dir, f"backup_{timestamp}.db")
+    if backup_name == None:
+        backup_name = timestamp
+    backup_file = os.path.join(backup_dir, f"backup_{backup_name}.db")
     shutil.copy("test.db", backup_file)
-    # clear checkin table
+    return backup_file
+
+@app.post("/backup", response_class=HTMLResponse)
+async def backup_data(data: dict, request: Request):
+    '''
+    backup database only, do not clear checkin table
+    '''
+    backup_name = data.get("backup_name", None)
+    backup_file = backup_data_(request, backup_name)
+    return templates.TemplateResponse("backup_success.html", {
+        "request": request,
+        "backup_file": backup_file,
+        "message": f"数据库已备份到 {backup_file}。",
+    })
+    
+@app.post("/archive", response_class=HTMLResponse)
+async def archive_data(data: dict, request:Request):
+    '''
+    backup database and clear current checkins 
+    save the user and bindinfo table
+    clear checkin table
+    '''
+    from sqlmodel import text
+    backup_name = data.get("backup_name", None)
+    backup_file = backup_data_(request, backup_name)
     with Session(engine) as session:
         sql = 'DELETE FROM checkin'
         session.exec(text(sql))
@@ -551,4 +627,3 @@ async def backup_data(request: Request):
             "backup_file": backup_file,
             "message": f"数据库已备份到 {backup_file}，并清空了打卡记录。",
         })
-    
