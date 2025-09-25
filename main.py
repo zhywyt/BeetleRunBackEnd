@@ -13,6 +13,8 @@ from fastapi.templating import Jinja2Templates
 import re
 from datetime import datetime, timedelta
 from fastapi.staticfiles import StaticFiles
+import datetime
+from datetime import datetime, timedelta
 
 
 @asynccontextmanager
@@ -96,8 +98,6 @@ def get_statistics(user_id: int)-> dict:
     '''
     return the statistics of user_id
     '''
-    import datetime
-    from datetime import datetime, timedelta
     with Session(engine) as session:
         statement = select(CheckIn).where(CheckIn.user_id == user_id)
         results = session.exec(statement)
@@ -263,7 +263,7 @@ async def check_in(data: dict, request: Request)-> HTMLResponse:
     '''
     error = None
     message = None
-    date_format = "%Y-%m-%d %H:%M:%S"
+    start_time = datetime.now()
     if type(data.get("distance")) != float:
         # try to parse 5.08km 5.08公里
         scale = 1
@@ -287,14 +287,16 @@ async def check_in(data: dict, request: Request)-> HTMLResponse:
             return templates.TemplateResponse("checkin/checkin_fail.html", {
                 "request": request,
                 "stat": None,
-                "error": error
+                "error": error,
+                "solve_time": (datetime.now() - start_time).total_seconds(),
             })
     checkin = CheckIn(**data)
     if not is_binded(checkin.user_id):
         return templates.TemplateResponse("checkin/checkin_fail.html", {
             "request": request,
             "stat": None,
-            "error": f"{checkin.user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。"
+            "error": f"{checkin.user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
     # check the date if is not UTC+8, convert it to UTC+8
     dt = datetime.strptime(checkin.date, date_format)
@@ -341,11 +343,13 @@ async def check_in(data: dict, request: Request)-> HTMLResponse:
             "today_checkin_count": checked_user_num,
             "css_style_path": chosen_css,
             "stat": stat,
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
 async def list_checkins_(user_id, page, size, request)-> HTMLResponse:
     '''
     list the checkins of user_id with pagination
     '''
+    start_time = datetime.now()
     try:
         page = int(page)
         size = int(size)
@@ -357,19 +361,22 @@ async def list_checkins_(user_id, page, size, request)-> HTMLResponse:
     if not user_id:
         return templates.TemplateResponse("checkin_fail.html", {
             "request": request,
-            "error": f"user_id is required."
+            "error": f"user_id is required.",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
     try:
         user_id = int(user_id)
     except:
         return templates.TemplateResponse("checkin_fail.html", {
             "request": request,
-            "error": f"user_id must be an integer."
+            "error": f"user_id must be an integer.",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
     if not is_binded(user_id):
         return templates.TemplateResponse("checkin_fail.html", {
             "request": request,
-            "error": f"{user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。"
+            "error": f"{user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
     with Session(engine) as session:
         # 统计数量
@@ -387,10 +394,12 @@ async def list_checkins_(user_id, page, size, request)-> HTMLResponse:
             "maxpage": int(maxpage) + 1,
             "size": size,
             "user_id": user_id,
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
     return templates.TemplateResponse("checkin_fail.html", {
         "request": request,
-        "error": f"{user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。"
+        "error": f"{user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。",
+        "solve_time": (datetime.now() - start_time).total_seconds(),
     })
 @app.post("/list", response_class=HTMLResponse)
 async def list_checkins(data: dict, request: Request)->HTMLResponse:
@@ -418,9 +427,11 @@ async def get_rank(request: Request):
     rank get api
     get the top 10 users by total distance
     '''
+    from datetime import datetime, timedelta
+    # cal solve time
+    start_time = datetime.now()
     with Session(engine) as session:
         rank_data = {}
-        from datetime import datetime, timedelta
         now = datetime.now()
         start_of_week = now - timedelta(days=now.weekday())
         # search all id to name map
@@ -446,12 +457,14 @@ async def get_rank(request: Request):
                 "name": data.get("name", ""),
                 "checkin_count": data.get("checkin_count", 0),
                 "week_distance": data.get("dist", 0),
-                "rank": idx
+                "rank": idx,
+                "solve_time": (datetime.now() - start_time).total_seconds(),
             })
         return templates.TemplateResponse("rank.html", {
             "request": request,
             "items": rank_list,
-            "week_label": get_current_week_range()
+            "week_label": get_current_week_range(),
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
 @app.post("/rank", response_class=HTMLResponse)
 async def post_rank(data:dict, request: Request):
@@ -498,7 +511,8 @@ async def post_rank(data:dict, request: Request):
                     "checkin_count": user_checkin_count.get(user_id, 0),
                     "week_distance": week_distance,
                     "total_distance": total_distance,
-                    "rank": idx
+                    "rank": idx,
+                    "solve_time": (datetime.now() - start_time).total_seconds(),
                 })
             label_key = "week_label"
             label = get_current_week_range()
@@ -518,7 +532,8 @@ async def post_rank(data:dict, request: Request):
                     "checkin_count": user_checkin_count.get(user_id, 0),
                     "month_distance": month_distance,
                     "total_distance": total_distance,
-                    "rank": idx
+                    "rank": idx,
+                    "solve_time": (datetime.now() - start_time).total_seconds(),
                 })
             label_key = "month_label"
             label = get_current_month_range()
@@ -529,7 +544,8 @@ async def post_rank(data:dict, request: Request):
                     "name": user_name_map.get(user_id, ""),
                     "checkin_count": user_checkin_count.get(user_id, 0),
                     "total_distance": total_distance,
-                    "rank": idx
+                    "rank": idx,
+                    "solve_time": (datetime.now() - start_time).total_seconds(),
                 })
             label_key = "total_label"
             label = get_current_total_range()
@@ -545,6 +561,7 @@ async def delete_checkin(data: dict, request: Request):
     data: {"user_id":123456}
     '''
     user_id = data.get("user_id")
+    start_time = datetime.now()
     if type(user_id) != int:
         try:
             user_id = int(user_id)
@@ -553,12 +570,14 @@ async def delete_checkin(data: dict, request: Request):
     if not user_id:
         return templates.TemplateResponse("checkin_fail.html", {
             "request": request,
-            "error": f"user_id is required."
+            "error": f"user_id is required.",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
     if not is_binded(user_id):
         return templates.TemplateResponse("checkin_fail.html", {
             "request": request,
-            "error": f"{user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。"
+            "error": f"{user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
     deleted_data = []
     with Session(engine) as session:
@@ -575,6 +594,7 @@ async def delete_checkin(data: dict, request: Request):
             "stat": None,
             "deleted_data" : deleted_data,
             "message": f"成功删除 {len(deleted_data)} 条打卡记录。",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
 
         
@@ -600,12 +620,14 @@ async def backup_data(data: dict, request: Request):
     '''
     backup database only, do not clear checkin table
     '''
+    start_time = datetime.now()
     backup_name = data.get("backup_name", None)
     backup_file = backup_data_(request, backup_name)
     return templates.TemplateResponse("backup_success.html", {
         "request": request,
         "backup_file": backup_file,
         "message": f"数据库已备份到 {backup_file}。",
+        "solve_time": (datetime.now() - start_time).total_seconds(),
     })
     
 @app.post("/archive", response_class=HTMLResponse)
@@ -615,6 +637,7 @@ async def archive_data(data: dict, request:Request):
     save the user and bindinfo table
     clear checkin table
     '''
+    start_time = datetime.now()
     from sqlmodel import text
     backup_name = data.get("backup_name", None)
     backup_file = backup_data_(request, backup_name)
@@ -626,4 +649,5 @@ async def archive_data(data: dict, request:Request):
             "request": request,
             "backup_file": backup_file,
             "message": f"数据库已备份到 {backup_file}，并清空了打卡记录。",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })

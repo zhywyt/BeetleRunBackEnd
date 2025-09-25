@@ -95,6 +95,13 @@
         {% else %}
         <div style="color:#e65100;">未找到任何可删除的打卡记录。</div>
         {% endif %}
+        {% if solve_time %}
+        <tr>
+            <td colspan="5" style="text-align:right;font-size:0.8em;color:#888;">
+                后端计算用时：{{"%.3f"|format(solve_time)}} s
+            </td>
+        </tr>
+        {% endif %}
         <a href="/" class="btn">返回首页</a>
     </div>
 </body>

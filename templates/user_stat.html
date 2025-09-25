@@ -70,6 +70,13 @@
             <div class="stat">本周距离：{{ '%.2f'|format(stat["本周距离"]) }} km</div>
         {% endif %}
         <a href="/" class="btn">返回首页</a>
+        {% if solve_time %}
+        <tr>
+            <td colspan="5" style="text-align:right;font-size:0.8em;color:#888;">
+                后端计算用时：{{"%.3f"|format(solve_time)}} s
+            </td>
+        </tr>
+        {% endif %}
     </div>
 </body>
 </html>

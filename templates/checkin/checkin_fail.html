@@ -68,6 +68,13 @@
             打卡失败！<br>
             {% if error %}{{ error }}{% else %}请稍后重试。{% endif %}
         </div>
+        {% if solve_time %}
+        <tr>
+            <td colspan="5" style="text-align:right;font-size:0.8em;color:#888;">
+                后端计算用时：{{"%.3f"|format(solve_time)}} s
+            </td>
+        </tr>
+        {% endif %}
         <a href="/" class="btn">返回首页</a>
     </div>
 </body>
