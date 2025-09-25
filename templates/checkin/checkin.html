@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>打卡成功！</title>
+    {% if css_style_path is not defined %}
+    {% set css_style_path = url_for('static', path='checkin/checkin.css') %}
+    {% else %}
+    <link rel="stylesheet" href="{{ css_style_path }}">
+    {% endif %}
+</head>
+<body>
+    {% if error %}
+    <h2 style="text-align:center;color:red;">{{ error }}</h2>
+    {% endif %}
+    <div class="card">
+        <div class="emoji">
+            <!-- 彩色勾SVG -->
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="24" cy="24" r="24" fill="#fda085"/>
+                <path d="M14 25.5L21 32.5L34 17.5" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+    <div class="success">打卡成功！</div>
+        {% if mileage is defined %}
+        本次里程：<div class="mileage">{{ '%.3f'|format(mileage) }} km</div>
+        {% endif %}
+        {% if message %} {{message}} {% endif %}
+        <div class="info">
+            恭喜{{name}}完成了今日打卡！
+            {% if today_checkin_count == 1 %}
+            这是你本周的第一个打卡哦，继续加油！
+            {% elif today_checkin_count > 1 %}
+            今天已经有{{ today_checkin_count}}个人已经打卡了！
+            {% endif %}
+            <br>
+            <span style="color:#ff9800;">Keep Running！</span>
+        </div>
+        {% if stat %}
+        <div class="info" style="margin-top:1.5em;">
+            <b>本周统计：</b><br>
+            打卡次数：{{ stat["本周打卡次数"] }}<br>
+            距离：{{ "%.3f"|format(stat["本周距离"]) }} km
+        </div>
+        {% endif %}
+        <a href="/rank" class="btn">查看排行榜</a>
+    </div>
+</body>
+</html>

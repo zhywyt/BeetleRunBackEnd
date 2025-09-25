@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import re
 from datetime import datetime, timedelta
+from fastapi.staticfiles import StaticFiles
 
 
 @asynccontextmanager
@@ -20,6 +21,7 @@ async def lifespan(app):
     yield
 
 app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="/root/beetleRunBk/static"), name="static")
 engine = create_engine("sqlite:///test.db")
 templates = Jinja2Templates(directory="templates")
 
@@ -50,6 +52,46 @@ def get_current_week_range() -> str:
     end_of_week = start_of_week + timedelta(days=6)
     week_label = f"{start_of_week.month}.{start_of_week.day}-{end_of_week.month}.{end_of_week.day}"
     return week_label
+def get_current_month_range() -> str:
+    '''
+    return the month range same as 9.1-9.30
+    '''
+    from datetime import datetime
+    now = datetime.now()
+    start_of_month = now.replace(day=1)
+    if now.month == 12:
+        end_of_month = now.replace(year=now.year+1, month=1, day=1) - timedelta(days=1)
+    else:
+        end_of_month = now.replace(month=now.month+1, day=1) - timedelta(days=1)
+    month_label = f"{start_of_month.month}.{start_of_month.day}-{end_of_month.month}.{end_of_month.day}"
+    return month_label
+def get_current_total_range() -> str:
+    '''
+    return the total range of checkin table same as 2023.9.1-2024.9.30
+    '''
+    with Session(engine) as session:
+        statement = select(CheckIn).order_by(CheckIn.date)
+        results = session.exec(statement)
+        checkins = results.all()
+        if not checkins:
+            return "无数据"
+        start_date = datetime.strptime(checkins[0].date, "%Y-%m-%d %H:%M:%S")
+        end_date = datetime.strptime(checkins[-1].date, "%Y-%m-%d %H:%M:%S")
+        total_label = f"{start_date.year}.{start_date.month}.{start_date.day}-{end_date.year}.{end_date.month}.{end_date.day}"
+        return total_label
+def get_today_checkin_users()-> list[int]:
+    '''
+    return the list of user_id who have checkin today
+    '''
+    from datetime import datetime, timedelta
+    with Session(engine) as session:
+        now = datetime.now()
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        statement = select(CheckIn).where(CheckIn.date >= start_of_day.strftime("%Y-%m-%d %H:%M:%S"))
+        results = session.exec(statement)
+        today_checkins = results.all()
+        user_ids = list(set([c.user_id for c in today_checkins]))
+        return user_ids
 def get_statistics(user_id: int):
     import datetime
     from datetime import datetime, timedelta
@@ -212,19 +254,22 @@ async def check_in(data: dict, request: Request):
         else:
             error = f"无法解析距离: {str(data.get('distance'))}，示例： 5.08km | 5.08公里 | 21.095千米 | 5000m | 5000米 | 3.1英里 | 3.5mile | 3.8miles"
         if error != None:
-            return templates.TemplateResponse("checkin_fail.html", {
+            return templates.TemplateResponse("checkin/checkin_fail.html", {
                 "request": request,
                 "stat": None,
                 "error": error
             })
     checkin = CheckIn(**data)
     if not is_binded(checkin.user_id):
-        return templates.TemplateResponse("checkin_fail.html", {
+        return templates.TemplateResponse("checkin/checkin_fail.html", {
             "request": request,
             "stat": None,
             "error": f"{checkin.user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。"
         })
     # 检查今天是否打过卡了
+    checked_users = get_today_checkin_users()
+    # 检查今天已经打的人数
+    checked_user_num = len(checked_users)
     with Session(engine) as session:
         now = datetime.now()
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -239,26 +284,28 @@ async def check_in(data: dict, request: Request):
             for c in today_checkins:
                 session.delete(c)
             session.commit()
-            message = f"{checkin.user_id} 今天已经打过卡了，新的打卡记录已覆盖旧记录。"
+            message = f"{checkin.user_id} 今天已经打过卡了，打卡记录已覆盖。"
     import random
-    template_choices = [
-        "checkin.html",
-        "checkin2.html",
-        "checkin3.html",
-        "checkin4.html",
-        "checkin5.html",
+    css_choices = [
+        "checkin/checkin.css",
+        "checkin/checkin2.css",
+        "checkin/checkin3.css",
+        "checkin/checkin4.css",
+        "checkin/checkin5.css",
     ]
-    chosen_template = random.choice(template_choices)
+    chosen_css = request.url_for('static', path=random.choice(css_choices))
     with Session(engine) as session:
         session.add(checkin)
         session.commit()
         session.refresh(checkin)
         stat = get_statistics(checkin.user_id)
-        return templates.TemplateResponse(chosen_template, {
+        return templates.TemplateResponse("checkin/checkin.html", {
             "request": request,
             "name": session.exec(select(User).where(User.user_id == checkin.user_id)).first().name,
             "mileage": checkin.distance,
             "message": message,
+            "today_checkin_count": checked_user_num,
+            "css_style_path": chosen_css,
             "stat": stat,
         })
 async def list_checkins_(user_id, page, size, request):
@@ -324,7 +371,6 @@ async def list_checkins_get(request: Request):
     return await list_checkins_(user_id, page, size, request)
 @app.get("/rank", response_class=HTMLResponse)
 async def get_rank(request: Request):
-    from sqlalchemy import func
     with Session(engine) as session:
         # 查询所有用户的总距离
         user_dist = {}
@@ -362,7 +408,89 @@ async def get_rank(request: Request):
             "items": rank_list,
             "week_label": get_current_week_range()
         })
-
+@app.post("/rank", response_class=HTMLResponse)
+async def post_rank(data:dict, request: Request):
+    # this api for admin, will pick all data but not front of 10
+    # data: {"mode" : "total" or "month" or "week"}
+    mode = data.get("mode", "month")
+    if mode not in ["total", "month", "week"]:
+        mode = "month"
+    with Session(engine) as session:
+        # 查询所有用户的总距离
+        user_dist = {}
+        user_checkin_count = {}
+        for row in session.exec(select(CheckIn.user_id, CheckIn.distance)):
+            uid = row.user_id
+            user_dist[uid] = user_dist.get(uid, 0) + row.distance
+            user_checkin_count[uid] = user_checkin_count.get(uid, 0) + 1
+        # 查询所有用户姓名
+        user_name_map = {u.user_id: u.name for u in session.exec(select(User))}
+        # 排序
+        sorted_users = sorted(user_dist.items(), key=lambda x: x[1], reverse=True)
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        start_of_week = now - timedelta(days=now.weekday())
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        rank_list = []
+        label_key = "week_label"
+        label = ""
+        if mode == "week":
+            for idx, (user_id, total_distance) in enumerate(sorted_users, 1):
+                # 查询该用户本周所有打卡
+                week_statement = select(CheckIn).where(
+                    (CheckIn.user_id == user_id) &
+                    (CheckIn.date >= start_of_week.strftime("%Y-%m-%d %H:%M:%S"))
+                )
+                week_checkins = session.exec(week_statement).all()
+                week_distance = sum(c.distance for c in week_checkins)
+                if week_distance < 1:
+                    continue
+                rank_list.append({
+                    "user_id": user_id,
+                    "name": user_name_map.get(user_id, ""),
+                    "checkin_count": user_checkin_count.get(user_id, 0),
+                    "week_distance": week_distance,
+                    "total_distance": total_distance,
+                    "rank": idx
+                })
+            label_key = "week_label"
+            label = get_current_week_range()
+        elif mode == "month":
+            for idx, (user_id, total_distance) in enumerate(sorted_users, 1):
+                month_statement = select(CheckIn).where(
+                    (CheckIn.user_id == user_id) &
+                    (CheckIn.date >= start_of_month.strftime("%Y-%m-%d %H:%M:%S"))
+                )
+                month_checkins = session.exec(month_statement).all()
+                month_distance = sum(c.distance for c in month_checkins)
+                if month_distance < 1:
+                    continue
+                rank_list.append({
+                    "user_id": user_id,
+                    "name": user_name_map.get(user_id, ""),
+                    "checkin_count": user_checkin_count.get(user_id, 0),
+                    "month_distance": month_distance,
+                    "total_distance": total_distance,
+                    "rank": idx
+                })
+            label_key = "month_label"
+            label = get_current_month_range()
+        elif mode == "total":
+            for idx, (user_id, total_distance) in enumerate(sorted_users, 1):
+                rank_list.append({
+                    "user_id": user_id,
+                    "name": user_name_map.get(user_id, ""),
+                    "checkin_count": user_checkin_count.get(user_id, 0),
+                    "total_distance": total_distance,
+                    "rank": idx
+                })
+            label_key = "total_label"
+            label = get_current_total_range()
+        return templates.TemplateResponse("rank.html", {
+            "request": request,
+            "items": rank_list,
+            label_key: label
+        })
 @app.post("/delete", response_class=HTMLResponse)
 async def delete_checkin(data: dict, request: Request):
     # data: {"user_id":123456}

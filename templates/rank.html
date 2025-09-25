@@ -41,14 +41,28 @@
     </style>
 </head>
 <body>
-    <h2 style="text-align:center;">甲壳虫跑团打卡排行榜 <span style="font-size:0.7em;color:#888;">（本周：{{ week_label }}）</span></h2>
+    <h2 style="text-align:center;">甲壳虫跑团打卡排行榜 <span style="font-size:0.7em;color:#888;">
+        {% if items[0].week_distance %}
+            （本周：{{ week_label }}）
+        {% elif items[0].month_distance %}
+            （本月：{{ month_label }}）
+        {% elif items[0].total_distance %}
+            （总计：{{ total_label }}）
+        {% endif %}
+    </span></h2>
     <table>
         <tr>
             <th>排名</th>
             <th>昵称</th>
             <th>用户ID</th>
-            <th>打卡次数</th>
+            <th>打卡天数</th>
+            {% if items[0].week_distance %}
             <th>本周距离（km）</th>
+            {% elif items[0].month_distance %}
+            <th>本月距离（km）</th>
+            {% elif items[0].total_distance %}
+            <th>总距离（km）</th>
+            {% endif %}
         </tr>
         {% for item in items %}
         <tr>
@@ -56,7 +70,13 @@
             <td>{{ item.name }}</td>
             <td>{{ item.user_id }}</td>
             <td>{{ item.checkin_count }}</td>
+            {% if item.week_distance %}
             <td>{{ "%.2f"|format(item.week_distance) }}</td>
+            {% elif item.month_distance %}
+            <td>{{ "%.2f"|format(item.month_distance) }}</td>
+            {% elif item.total_distance %}
+            <td>{{ "%.2f"|format(item.total_distance) }}</td>
+            {% endif %}
         </tr>
         {% endfor %}
     </table>
