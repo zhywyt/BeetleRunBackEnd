@@ -10,26 +10,31 @@
     {% endif %}
 </head>
 <body>
+    <!-- 背景装饰图片 -->
+    <div class="background-decoration">
+        <img src="{{ url_for('static', path='image/runningclub.jpg') }}" alt="跑步俱乐部" class="bg-image">
+    </div>
     {% if error %}
     <h2 style="text-align:center;color:red;">{{ error }}</h2>
     {% endif %}
     <div class="card">
-        <div class="emoji">
-            <!-- 彩色勾SVG -->
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="24" cy="24" r="24" fill="#fda085"/>
-                <path d="M14 25.5L21 32.5L34 17.5" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+        <!-- 俱乐部图标 -->
+        <div class="club-header">
+            <!-- <div class="club-text-left">甲壳虫</div> -->
+            <div class="club-icon">
+                <img src="{{ url_for('static', path='image/icon.jpeg') }}" alt="俱乐部图标" class="icon-image">
+            </div>
+            <!-- <div class="club-text-right">跑团</div> -->
         </div>
+    <div class="success">恭喜{{name}}</div>
     <div class="success">打卡成功！</div>
         {% if mileage is defined %}
         本次里程：<div class="mileage">{{ '%.3f'|format(mileage) }} km</div>
         {% endif %}
         {% if message %} {{message}} {% endif %}
         <div class="info">
-            恭喜{{name}}完成了今日打卡！
             {% if today_checkin_count == 1 %}
-            这是你本周的第一个打卡哦，继续加油！
+            太棒了！这是你今天的第一个打卡的哦，继续加油！
             {% elif today_checkin_count > 1 %}
             今天已经有{{ today_checkin_count}}个人已经打卡了！
             {% endif %}
@@ -50,7 +55,24 @@
             </td>
         </tr>
         {% endif %}
-        <a href="/rank" class="btn">查看排行榜</a>
+        <!-- <div class="actions"> -->
+            <!-- <a href="/rank" class="btn">查看排行榜</a> -->
+        <!-- </div> -->
+        
+        <!-- 二维码区域 -->
+        <div class="qr-section">
+            <p>扫码关注我们的微信公众号和加入跑步群：</p>
+            <div class="qr-container">
+                <div class="qr-item">
+                    <img src="{{ url_for('static', path='image/qr.jpeg') }}" alt="微信公众号二维码" class="qr-code">
+                    <p class="qr-label">微信公众号</p>
+                </div>
+                <div class="qr-item">
+                    <img src="{{ url_for('static', path='image/groupqr.png') }}" alt="跑步群二维码" class="qr-code">
+                    <p class="qr-label">跑步群</p>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 </html>

@@ -13,8 +13,6 @@ from fastapi.templating import Jinja2Templates
 import re
 from datetime import datetime, timedelta
 from fastapi.staticfiles import StaticFiles
-import datetime
-from datetime import datetime, timedelta
 
 
 @asynccontextmanager
@@ -48,7 +46,6 @@ def get_current_week_range() -> str:
     '''
     return the week range same as 9.22-9.28
     '''
-    from datetime import datetime, timedelta
     now = datetime.now()
     start_of_week = now - timedelta(days=now.weekday())
     end_of_week = start_of_week + timedelta(days=6)
@@ -58,7 +55,6 @@ def get_current_month_range() -> str:
     '''
     return the month range same as 9.1-9.30
     '''
-    from datetime import datetime
     now = datetime.now()
     start_of_month = now.replace(day=1)
     if now.month == 12:
@@ -85,7 +81,6 @@ def get_today_checkin_users()-> list[int]:
     '''
     return the list of user_id who have checkin today
     '''
-    from datetime import datetime, timedelta
     with Session(engine) as session:
         now = datetime.now()
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -324,10 +319,10 @@ async def check_in(data: dict, request: Request)-> HTMLResponse:
     import random
     css_choices = [
         "checkin/checkin.css",
-        "checkin/checkin2.css",
-        "checkin/checkin3.css",
-        "checkin/checkin4.css",
-        "checkin/checkin5.css",
+        # "checkin/checkin2.css",
+        # "checkin/checkin3.css",
+        # "checkin/checkin4.css",
+        # "checkin/checkin5.css",
     ]
     chosen_css = request.url_for('static', path=random.choice(css_choices))
     with Session(engine) as session:
@@ -427,7 +422,6 @@ async def get_rank(request: Request):
     rank get api
     get the top 10 users by total distance
     '''
-    from datetime import datetime, timedelta
     # cal solve time
     start_time = datetime.now()
     with Session(engine) as session:
@@ -458,7 +452,6 @@ async def get_rank(request: Request):
                 "checkin_count": data.get("checkin_count", 0),
                 "week_distance": data.get("dist", 0),
                 "rank": idx,
-                "solve_time": (datetime.now() - start_time).total_seconds(),
             })
         return templates.TemplateResponse("rank.html", {
             "request": request,
@@ -473,6 +466,7 @@ async def post_rank(data:dict, request: Request):
     data: {"mode" : "total" or "month" or "week"}
     '''
     mode = data.get("mode", "month")
+    start_time = datetime.now()
     if mode not in ["total", "month", "week"]:
         mode = "month"
     with Session(engine) as session:
@@ -487,7 +481,6 @@ async def post_rank(data:dict, request: Request):
         user_name_map = {u.user_id: u.name for u in session.exec(select(User))}
         # 排序
         sorted_users = sorted(user_dist.items(), key=lambda x: x[1], reverse=True)
-        from datetime import datetime, timedelta
         now = datetime.now()
         start_of_week = now - timedelta(days=now.weekday())
         start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -512,7 +505,6 @@ async def post_rank(data:dict, request: Request):
                     "week_distance": week_distance,
                     "total_distance": total_distance,
                     "rank": idx,
-                    "solve_time": (datetime.now() - start_time).total_seconds(),
                 })
             label_key = "week_label"
             label = get_current_week_range()
@@ -533,7 +525,6 @@ async def post_rank(data:dict, request: Request):
                     "month_distance": month_distance,
                     "total_distance": total_distance,
                     "rank": idx,
-                    "solve_time": (datetime.now() - start_time).total_seconds(),
                 })
             label_key = "month_label"
             label = get_current_month_range()
@@ -545,14 +536,14 @@ async def post_rank(data:dict, request: Request):
                     "checkin_count": user_checkin_count.get(user_id, 0),
                     "total_distance": total_distance,
                     "rank": idx,
-                    "solve_time": (datetime.now() - start_time).total_seconds(),
                 })
             label_key = "total_label"
             label = get_current_total_range()
         return templates.TemplateResponse("rank.html", {
             "request": request,
             "items": rank_list,
-            label_key: label
+            label_key: label,
+            "solve_time": (datetime.now() - start_time).total_seconds(),
         })
 @app.post("/delete", response_class=HTMLResponse)
 async def delete_checkin(data: dict, request: Request):
@@ -604,7 +595,6 @@ def backup_data_(request: Request, backup_name=None):
     '''
     import os
     import shutil
-    from datetime import datetime
     backup_dir = "backups"
     os.makedirs(backup_dir, exist_ok=True)
     # there is not parse checkin.date need not date_format var

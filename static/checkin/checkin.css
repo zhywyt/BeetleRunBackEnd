@@ -6,7 +6,7 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 90vh;
+    min-height: 100vh;
     margin: 0 auto;
     width: 90vw;
     max-width: 480px;
@@ -66,4 +66,129 @@ body {
 .btn:hover {
     background: #f6d365;
     color: #ff9800;
+}
+
+/* 背景装饰 */
+.background-decoration {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    overflow: hidden;
+}
+
+.bg-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.1;
+    filter: blur(2px);
+}
+
+/* 俱乐部图标和文字 */
+.club-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1em;
+    gap: 1.5em;
+    position: relative;
+}
+
+.club-icon {
+    flex-shrink: 0;
+    z-index: 2;
+}
+
+.icon-image {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #fda085;
+    box-shadow: 0 2px 12px rgba(253, 160, 133, 0.4);
+}
+
+.club-text-left,
+.club-text-right {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #ff9800;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    letter-spacing: 0.2em;
+    position: relative;
+}
+
+.club-text-left {
+    transform: rotate(-15deg);
+    transform-origin: center;
+}
+
+.club-text-right {
+    transform: rotate(15deg);
+    transform-origin: center;
+}
+
+/* 二维码区域 */
+.qr-section {
+    margin-top: 0.5em;
+    padding-top: 2em;
+    border-top: 1px solid #eee;
+}
+
+.qr-section > p {
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 1em;
+}
+
+.qr-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    gap: 1em;
+}
+
+.qr-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.qr-code {
+    width: 120px;
+    height: 120px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.qr-label {
+    margin-top: 0.5em;
+    font-size: 0.8em;
+    color: #666;
+    text-align: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+    .icon-image {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .club-text-left,
+    .club-text-right {
+        font-size: 1.4em;
+    }
+    
+    .club-header {
+        gap: 1.2em;
+    }
+    
+    .qr-code {
+        width: 100px;
+        height: 100px;
+    }
 }
