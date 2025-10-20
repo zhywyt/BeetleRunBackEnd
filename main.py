@@ -146,7 +146,7 @@ async def web_query(data: dict):
         except:
             pass
     with Session(engine) as session:
-        stmt = select(CheckIn)
+        stmt = select(CheckIn).order_by(CheckIn.date.desc())
         if filters:
             for f in filters:
                 stmt = stmt.where(f)
@@ -158,6 +158,7 @@ async def web_query(data: dict):
             if name and user_map.get(c.user_id, "") != name:
                 continue
             result.append({
+                "id": c.id,
                 "user_id": c.user_id,
                 "name": user_map.get(c.user_id, ""),
                 "date": c.date,
@@ -470,7 +471,7 @@ async def post_rank(data:dict, request: Request):
     if mode not in ["total", "month", "week"]:
         mode = "month"
     with Session(engine) as session:
-        # 查询所有用户的总距离
+        # 查询所有用户的总距离和总打卡次数（全时段）
         user_dist = {}
         user_checkin_count = {}
         for row in session.exec(select(CheckIn.user_id, CheckIn.distance)):
@@ -478,67 +479,90 @@ async def post_rank(data:dict, request: Request):
             user_dist[uid] = user_dist.get(uid, 0) + row.distance
             user_checkin_count[uid] = user_checkin_count.get(uid, 0) + 1
         # 查询所有用户姓名
-        user_name_map = {u.user_id: u.name for u in session.exec(select(User))}
-        # 排序
-        sorted_users = sorted(user_dist.items(), key=lambda x: x[1], reverse=True)
+        user_name_map = {u.user_id: u.name for u in session.exec(select(User)).all()}
+
         now = datetime.now()
         start_of_week = now - timedelta(days=now.weekday())
         start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
         rank_list = []
         label_key = "week_label"
         label = ""
+
+        # Helper to build and sort rank list by a key
         if mode == "week":
-            for idx, (user_id, total_distance) in enumerate(sorted_users, 1):
-                # 查询该用户本周所有打卡
+            # build list of users with their week_distance
+            temp = []
+            for uid in user_dist.keys():
                 week_statement = select(CheckIn).where(
-                    (CheckIn.user_id == user_id) &
+                    (CheckIn.user_id == uid) &
                     (CheckIn.date >= start_of_week.strftime(date_format))
                 )
                 week_checkins = session.exec(week_statement).all()
                 week_distance = sum(c.distance for c in week_checkins)
+                week_count = len(week_checkins)
                 if week_distance < 1:
                     continue
-                rank_list.append({
-                    "user_id": user_id,
-                    "name": user_name_map.get(user_id, ""),
-                    "checkin_count": user_checkin_count.get(user_id, 0),
+                temp.append({
+                    "user_id": uid,
+                    "name": user_name_map.get(uid, ""),
+                    "checkin_count": week_count,
                     "week_distance": week_distance,
-                    "total_distance": total_distance,
-                    "rank": idx,
+                    "total_distance": user_dist.get(uid, 0),
                 })
+            # sort by week_distance desc
+            temp = sorted(temp, key=lambda x: x["week_distance"], reverse=True)
+            for idx, item in enumerate(temp, 1):
+                item["rank"] = idx
+            rank_list = temp
             label_key = "week_label"
             label = get_current_week_range()
+
         elif mode == "month":
-            for idx, (user_id, total_distance) in enumerate(sorted_users, 1):
+            temp = []
+            for uid in user_dist.keys():
                 month_statement = select(CheckIn).where(
-                    (CheckIn.user_id == user_id) &
+                    (CheckIn.user_id == uid) &
                     (CheckIn.date >= start_of_month.strftime(date_format))
                 )
                 month_checkins = session.exec(month_statement).all()
                 month_distance = sum(c.distance for c in month_checkins)
+                month_count = len(month_checkins)
                 if month_distance < 1:
                     continue
-                rank_list.append({
-                    "user_id": user_id,
-                    "name": user_name_map.get(user_id, ""),
-                    "checkin_count": user_checkin_count.get(user_id, 0),
+                temp.append({
+                    "user_id": uid,
+                    "name": user_name_map.get(uid, ""),
+                    "checkin_count": month_count,
                     "month_distance": month_distance,
-                    "total_distance": total_distance,
-                    "rank": idx,
+                    "total_distance": user_dist.get(uid, 0),
                 })
+            temp = sorted(temp, key=lambda x: x["month_distance"], reverse=True)
+            for idx, item in enumerate(temp, 1):
+                item["rank"] = idx
+            rank_list = temp
             label_key = "month_label"
             label = get_current_month_range()
-        elif mode == "total":
-            for idx, (user_id, total_distance) in enumerate(sorted_users, 1):
-                rank_list.append({
-                    "user_id": user_id,
-                    "name": user_name_map.get(user_id, ""),
-                    "checkin_count": user_checkin_count.get(user_id, 0),
+
+        else:  # total
+            temp = []
+            for uid, total_distance in user_dist.items():
+                total_count = user_checkin_count.get(uid, 0)
+                if total_distance < 1:
+                    continue
+                temp.append({
+                    "user_id": uid,
+                    "name": user_name_map.get(uid, ""),
+                    "checkin_count": total_count,
                     "total_distance": total_distance,
-                    "rank": idx,
                 })
+            temp = sorted(temp, key=lambda x: x["total_distance"], reverse=True)
+            for idx, item in enumerate(temp, 1):
+                item["rank"] = idx
+            rank_list = temp
             label_key = "total_label"
             label = get_current_total_range()
+
         return templates.TemplateResponse("rank.html", {
             "request": request,
             "items": rank_list,
@@ -587,7 +611,29 @@ async def delete_checkin(data: dict, request: Request):
             "message": f"成功删除 {len(deleted_data)} 条打卡记录。",
             "solve_time": (datetime.now() - start_time).total_seconds(),
         })
-
+@app.post("/erase")
+async def erase_checkinfo(data: dict):
+    '''
+    erase the checkin info record
+    data: {"id": 123456}
+    '''
+    record_id = data.get("id")
+    if type(record_id) != int:
+        try:
+            record_id = int(record_id)
+        except:
+            record_id = None
+    if not record_id:
+        return JSONResponse(content={"error": "id is required."}, status_code=400)
+    with Session(engine) as session:
+        statement = select(CheckIn).where(CheckIn.id == record_id)
+        results = session.exec(statement)
+        checkin = results.first()
+        if not checkin:
+            return JSONResponse(content={"error": f"Record with id {record_id} not found."}, status_code=404)
+        session.delete(checkin)
+        session.commit()
+        return JSONResponse(content={"message": f"Record with id {record_id} deleted successfully."})
         
 def backup_data_(request: Request, backup_name=None):
     '''

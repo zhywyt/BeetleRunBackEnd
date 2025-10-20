@@ -52,6 +52,31 @@
         button:hover {
             background: #fed6e3;
         }
+        /* delete button style only */
+        .del-btn {
+            padding: 0.35em 0.9em;
+            background: linear-gradient(90deg, #ff7a7a 0%, #ff3b3b 100%);
+            color: #fff;
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.95em;
+            box-shadow: 0 2px 6px rgba(255,59,59,0.18);
+            transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+        }
+        .del-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(255,59,59,0.18);
+            opacity: 0.98;
+        }
+        .del-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(255,59,59,0.12);
+        }
+        .del-btn:focus {
+            outline: 2px solid rgba(255,59,59,0.14);
+            outline-offset: 2px;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -68,6 +93,17 @@
             font-weight: 600;
         }
         tr:nth-child(even) {background: #fafafa;}
+        /* message box for inline notices (delete results etc.) */
+        .msg-box {
+            display: none;
+            padding: 0.8em 1em;
+            border-radius: 8px;
+            margin-bottom: 1em;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .msg-box.success { background: linear-gradient(90deg,#e6ffef 0%,#d0ffd9 100%); color: #0b6b2b; }
+        .msg-box.error { background: linear-gradient(90deg,#ffeaea 0%,#ffd6d6 100%); color: #7a1414; }
     </style>
 </head>
 <body>
@@ -78,6 +114,7 @@
         <a href="#" id="userListLink" style="margin:0 1em;">打卡记录</a>
     </div>
     <div class="container">
+        <div id="msgBox" class="msg-box"></div>
         <h2>数据库数据筛选查阅</h2>
         <form id="filterForm">
             <label>用户ID: <input type="text" name="user_id" /></label>
@@ -89,11 +126,13 @@
         <table id="resultTable">
             <thead>
                 <tr>
+                    <th>任务ID</th>
                     <th>用户ID</th>
                     <th>姓名</th>
                     <th>日期</th>
                     <th>距离(km)</th>
                     <th>备注</th>
+                    <th>操作</th>
                 </tr>
             </thead>
             <tbody>
@@ -103,11 +142,19 @@
     </div>
     <script>
         // 跳转用户统计和打卡记录时校验用户ID
+        function showMessage(text, type='success', timeout=3000) {
+            const box = document.getElementById('msgBox');
+            box.textContent = text;
+            box.className = 'msg-box ' + (type === 'error' ? 'error' : 'success');
+            box.style.display = 'block';
+            if(timeout > 0) setTimeout(()=>{ box.style.display = 'none'; }, timeout);
+        }
+
         document.getElementById('userStatLink').onclick = function(e) {
             e.preventDefault();
             var userId = document.querySelector('input[name="user_id"]').value.trim();
             if(!userId) {
-                alert('请先填写用户ID！');
+                showMessage('请先填写用户ID！', 'error');
                 document.querySelector('input[name="user_id"]').focus();
                 return false;
             }
@@ -117,7 +164,7 @@
             e.preventDefault();
             var userId = document.querySelector('input[name="user_id"]').value.trim();
             if(!userId) {
-                alert('请先填写用户ID！');
+                showMessage('请先填写用户ID！', 'error');
                 document.querySelector('input[name="user_id"]').focus();
                 return false;
             }
@@ -145,11 +192,51 @@
             if(result && result.items && result.items.length > 0) {
                 result.items.forEach(item => {
                     const tr = document.createElement('tr');
-                    tr.innerHTML = `<td>${item.user_id}</td><td>${item.name||''}</td><td>${item.date}</td><td>${item.distance}</td><td>${item.order||''}</td>`;
+                    tr.dataset.recordId = item.id;
+                    tr.innerHTML = `
+                        <td>${item.id}</td>
+                        <td>${item.user_id}</td>
+                        <td>${item.name||''}</td>
+                        <td>${item.date}</td>
+                        <td>${item.distance}</td>
+                        <td>${item.order||''}</td>
+                        <td><button class="del-btn">删除</button></td>
+                    `;
                     tbody.appendChild(tr);
                 });
+                // attach delete handlers
+                tbody.querySelectorAll('.del-btn').forEach(btn => {
+                    btn.addEventListener('click', async function(e) {
+                        const tr = e.target.closest('tr');
+                        const recordId = tr.dataset.recordId;
+                        if(!recordId) return;
+                        if(!confirm('确认删除 ID=' + recordId + ' 的记录？此操作不可恢复。')) return;
+                        try {
+                            const resp = await fetch('/erase', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: Number(recordId) })
+                            });
+                            if(resp.ok) {
+                                const json = await resp.json();
+                                // remove row from table
+                                tr.remove();
+                                // if table empty now, show no-data row
+                                if(!tbody.querySelector('tr')) {
+                                    tbody.innerHTML = '<tr><td colspan="7">无数据</td></tr>';
+                                }
+                                showMessage(json.message || '删除成功', 'success');
+                            } else {
+                                const err = await resp.json().catch(()=>({ error: '删除失败' }));
+                                showMessage(err.error || '删除失败', 'error');
+                            }
+                        } catch (err) {
+                            showMessage('网络错误，删除失败', 'error');
+                        }
+                    });
+                });
             } else {
-                tbody.innerHTML = '<tr><td colspan="5">无数据</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7">无数据</td></tr>';
             }
         });
     </script>
