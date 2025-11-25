@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>手动打卡</title>
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 480px;
+            margin: 2em auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            padding: 2em 2.5em;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+        }
+        label {
+            font-weight: 500;
+            margin-bottom: 0.3em;
+        }
+        input {
+            padding: 0.4em 0.8em;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+        }
+        button {
+            padding: 0.5em 1.5em;
+            background: linear-gradient(90deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 1em;
+        }
+        button:hover {
+            background: #fed6e3;
+        }
+        /* keep the floating top message hidden initially, but allow inserted msg-boxes to display */
+        #msgBox { display: none; }
+        .msg-box {
+            display: block;
+            padding: 0.8em 1em;
+            border-radius: 8px;
+            margin-bottom: 1em;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            box-sizing: border-box;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+        .msg-box.success { background: linear-gradient(90deg,#e6ffef 0%,#d0ffd9 100%); color: #0b6b2b; }
+        .msg-box.error { background: linear-gradient(90deg,#ffeaea 0%,#ffd6d6 100%); color: #7a1414; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="msgBox" class="msg-box"></div>
+        <h2>手动打卡</h2>
+        <form id="checkinForm">
+            <label>用户ID: <input type="number" name="user_id" required /></label>
+            <label>消息ID: <input type="number" name="message_id" required /></label>
+            <label>打卡内容: <input type="text" name="order" placeholder="如：打卡 10" required /></label>
+            <label>距离: <input type="text" name="distance" placeholder="如：5.08km 或 5000米" required /></label>
+            <label>打卡时间: <input type="datetime-local" name="date" required /></label>
+            <button type="submit">提交打卡</button>
+        </form>
+        <hr style="margin:2em 0;">
+        <div style="margin-bottom:1em;padding:0.8em 1em;background:#f7f7fa;border-radius:8px;font-size:0.98em;">
+            <b>CSV文件格式要求：</b><br>
+            第一行为表头，内容如下：<br>
+            <code>user_id,message_id,order,distance,date</code><br>
+            每行对应一条打卡记录，例如：<br>
+            <pre style="background:#f4f4f4;border-radius:6px;padding:0.5em 1em;overflow:auto;">
+user_id,message_id,order,distance,date
+123456,78901,打卡 5.08km,5.08km,2025-10-22 08:30:00
+234567,78902,打卡 3000米,3000米,2025-10-22 09:00:00
+            </pre>
+            <span style="color:#7a1414;">注意：</span> <br>
+            <ul style="margin:0 0 0 1.2em;padding:0;">
+                <li>日期格式为 <code>yyyy-MM-dd HH:mm:ss</code></li>
+                <li>距离支持如 <code>5.08km</code>、<code>3000米</code> 等格式</li>
+                <li>user_id 必须已绑定，否则该行会失败</li>
+            </ul>
+        </div>
+        <form id="csvForm" enctype="multipart/form-data">
+            <label>批量打卡（CSV文件）：<input type="file" name="csvfile" accept=".csv" required /></label>
+            <div style="display:flex;gap:0.6em;margin-top:0.6em;align-items:center;">
+                <button type="submit">上传并批量打卡</button>
+                <button id="downloadTemplate" type="button" style="background:#fff;border:1px solid #ccc;padding:0.45em 0.8em;border-radius:6px;">下载 CSV 模板</button>
+                <a id="downloadFallback" href="/checkin_template" style="display:none;">备用下载链接</a>
+            </div>
+        </form>
+        <div id="csvResult" style="margin-top:1em;"></div>
+    </div>
+    <script>
+        function showMessage(text, type='success', timeout=3500) {
+            const box = document.getElementById('msgBox');
+            box.textContent = text;
+            box.className = 'msg-box ' + (type === 'error' ? 'error' : 'success');
+            box.style.display = 'block';
+            if(timeout > 0) setTimeout(()=>{ box.style.display = 'none'; }, timeout);
+        }
+        document.getElementById('checkinForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                user_id: Number(form.user_id.value),
+                message_id: Number(form.message_id.value),
+                order: form.order.value,
+                distance: form.distance.value,
+                date: form.date.value.replace('T', ' ')
+            };
+            // 转换时间格式为 yyyy-MM-dd HH:mm:ss
+            if(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(data.date)) {
+                if(data.date.length === 16) data.date += ':00';
+            } else {
+                showMessage('时间格式错误，请选择正确的打卡时间。', 'error');
+                return;
+            }
+            try {
+                const resp = await fetch('/checkin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if(resp.ok) {
+                    showMessage('打卡成功！', 'success');
+                    form.reset();
+                } else {
+                    const html = await resp.text();
+                    showMessage('打卡失败：' + (html.match(/<div[^>]*class="msg-box[^>]*>(.*?)<\/div>/)?.[1] || '请检查输入或绑定状态'), 'error', 5000);
+                }
+            } catch (err) {
+                showMessage('网络错误，打卡失败', 'error');
+            }
+        });
+        // 批量打卡 CSV
+        document.getElementById('csvForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const fileInput = form.csvfile;
+            if(!fileInput.files.length) {
+                showMessage('请选择CSV文件', 'error');
+                return;
+            }
+            const fd = new FormData();
+            // send the file under both common field names to be tolerant to backend handling
+            fd.append('file', fileInput.files[0]);
+            fd.append('csvfile', fileInput.files[0]);
+            try {
+                const resp = await fetch('/checkin_csv', {
+                    method: 'POST',
+                    body: fd
+                });
+                const resultDiv = document.getElementById('csvResult');
+                // debug info: status and content-type
+                console.log('checkin_csv response status:', resp.status, 'headers:', resp.headers.get('content-type'));
+                let json = null;
+                try {
+                    json = await resp.json();
+                } catch (parseErr) {
+                    // fallback: try to read text and attempt parse, otherwise display raw
+                    const txt = await resp.text();
+                    console.warn('Failed to parse JSON from /checkin_csv:', parseErr, 'raw text:', txt);
+                    try {
+                        json = JSON.parse(txt);
+                    } catch (e2) {
+                        // show raw response to help debugging
+                        resultDiv.innerHTML = '<div class="msg-box error">无法解析返回内容，服务器返回: <pre style="white-space:pre-wrap;">' + escapeHtml(txt) + '</pre></div>';
+                        return;
+                    }
+                }
+                // normalize success / error to arrays safely
+                let html = '';
+                const successArr = Array.isArray(json.success) ? json.success : (json.success ? [json.success] : []);
+                const errorArr = Array.isArray(json.error) ? json.error : (json.error ? [json.error] : []);
+                if(successArr.length) {
+                    html += '<div class="msg-box success"><b>成功 (共 ' + successArr.length + ' 条)：</b><br>' +
+                        successArr.map(s=>{
+                            if(typeof s === 'string') return escapeHtml(s);
+                            return `第${escapeHtml(String(s.line))}行: user_id=${escapeHtml(String(s.user_id))} id=${escapeHtml(String(s.record_id))} date=${escapeHtml(String(s.date))} distance=${escapeHtml(String(s.distance))}`;
+                        }).join('<br>') + '</div>';
+                }
+                if(errorArr.length) {
+                    html += '<div class="msg-box error"><b>失败 (共 ' + errorArr.length + ' 条)：</b><br>' + errorArr.map(x=>escapeHtml(String(x))).join('<br>') + '</div>';
+                }
+                // overall summary
+                html = '<div style="margin-bottom:0.6em;font-weight:700;">上传完成，处理结果如下：</div>' + html;
+                resultDiv.innerHTML = html;
+            } catch (err) {
+                document.getElementById('csvResult').innerHTML = '<div class="msg-box error">网络错误，批量打卡失败</div>';
+            }
+        });
+        // tiny helper to escape HTML when showing raw server responses
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+        // download template button handler: fetch and download
+        document.getElementById('downloadTemplate').addEventListener('click', async function(){
+            try {
+                const resp = await fetch('/checkin_template');
+                if(!resp.ok) {
+                    const txt = await resp.text();
+                    showMessage('获取模板失败：' + txt, 'error');
+                    return;
+                }
+                const blob = await resp.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                // try to extract filename from Content-Disposition header
+                const cd = resp.headers.get('content-disposition');
+                let filename = 'template_checkin.csv';
+                if(cd) {
+                    const m = /filename\*=UTF-8''([^;]+)/.exec(cd) || /filename="?([^";]+)"?/.exec(cd);
+                    if(m && m[1]) filename = decodeURIComponent(m[1]);
+                }
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } catch (e) {
+                showMessage('下载模板失败，请稍后重试', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

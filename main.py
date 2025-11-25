@@ -2,10 +2,12 @@
 beetleRunBk/main.py
 writed by zhywyt at 2025/9/25
 coding with utf-8
+There are must to use some chinese for comments and strings in this file. please coding with utf-8
+中文测试，如果你看得清我，说明你的编码正确。
 '''
-from fastapi.responses import JSONResponse
-from fastapi import FastAPI, Body, Request
-import json
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, Body, Request, File, UploadFile
+import json, csv
 from contextlib import asynccontextmanager
 from sqlmodel import SQLModel, Field, Session, create_engine, select
 from fastapi.responses import HTMLResponse
@@ -172,6 +174,12 @@ async def read_root(request: Request):
     page for root
     '''
     return templates.TemplateResponse("web.html", {"request": request})
+@app.get("/checkin", response_class=HTMLResponse)
+async def read_root(request: Request):
+    '''
+    page for root
+    '''
+    return templates.TemplateResponse("checkin.html", {"request": request})
 async def get_user_stat_(user_id, request):
     error = None
     stat = None
@@ -250,12 +258,147 @@ async def bind_user(data: BindInfo, request: Request):
         "user_id": user_id,
         "count": count
     })
+# 批量打卡接口：上传CSV文件，自动处理
+@app.post("/checkin_csv")
+async def checkin_csv(request: Request, file: UploadFile | None = File(default=None)):
+    '''
+    接收CSV文件，批量打卡。CSV需包含表头：user_id,message_id,order,distance,date
+    支持表单字段名 `file` 或 `csvfile`。对空文件与多种编码做容错处理。
+    该接口不处理当日覆盖操作，只往表中添加，出现错误可以及时删除。
+    '''
+    # Try to obtain the UploadFile from common field names if not provided
+    upload = file
+    if upload is None:
+        # attempt to get under alternate field name
+        form = await request.form()
+        if 'csvfile' in form:
+            maybe = form['csvfile']
+            if isinstance(maybe, UploadFile):
+                upload = maybe
+        elif 'file' in form and isinstance(form['file'], UploadFile):
+            upload = form['file']
+
+    if upload is None:
+        return JSONResponse(content={"success": [], "error": ["没有上传文件，请使用字段名 'file' 或 'csvfile' 上传 CSV。"]}, status_code=400)
+
+    content = await upload.read()
+    if not content:
+        return JSONResponse(content={"success": [], "error": ["上传的文件为空。请检查文件是否包含内容。"]}, status_code=400)
+
+    # Try a few common encodings
+    decode_errors = []
+    text = None
+    for enc in ("utf-8", "gbk", "gb18030"):
+        try:
+            text = content.decode(enc)
+            break
+        except Exception as e:
+            decode_errors.append(f"{enc}: {str(e)}")
+    if text is None:
+        return JSONResponse(content={"success": [], "error": [f"无法解码上传文件，尝试的编码失败：{decode_errors}"]}, status_code=400)
+
+    lines = text.splitlines()
+    try:
+        reader = csv.DictReader(lines)
+    except Exception as e:
+        return JSONResponse(content={"success": [], "error": [f"解析 CSV 失败：{str(e)}"]}, status_code=400)
+
+    results = []
+    errors = []
+    # iterate with index starting at 1 to match user-facing line numbers (excluding header)
+    for idx, row in enumerate(reader, 1):
+        try:
+            if not row:
+                errors.append(f"第{idx}行: 空行")
+                continue
+            # 构造数据并做基本校验
+            try:
+                uid = int(row.get("user_id", ""))
+            except:
+                raise ValueError("user_id 无效或缺失")
+            try:
+                mid = int(row.get("message_id", ""))
+            except:
+                raise ValueError("message_id 无效或缺失")
+            order = row.get("order", "")
+            distance = row.get("distance", "")
+            date_s = row.get("date", "")
+            if not date_s:
+                raise ValueError("date 缺失")
+
+            data = {
+                "user_id": uid,
+                "message_id": mid,
+                "order": order,
+                "distance": distance,
+                "date": date_s
+            }
+
+            # 复用 check_in 逻辑 but without calling the endpoint: validate bind and parse date
+            checkin = CheckIn(**data)
+            if not is_binded(checkin.user_id):
+                errors.append(f"第{idx}行: 用户未绑定 user_id={checkin.user_id}")
+                continue
+            # validate date
+            try:
+                dt = datetime.strptime(checkin.date, date_format)
+            except Exception as e:
+                raise ValueError(f"日期格式错误: {str(e)}，期望格式: {date_format}")
+            checkin.date = dt.strftime(date_format)
+
+            # try to convert distance similarly to check_in endpoint
+            if type(checkin.distance) != float:
+                dist_str = str(checkin.distance)
+                scale = 1
+                match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(km|公里|千米)', dist_str)
+                if not match:
+                    match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(英里|miles|mile)', dist_str)
+                    scale = 1.60934
+                if not match:
+                    match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(m|米)', dist_str)
+                    scale = 0.001
+                if match:
+                    checkin.distance = float(match.group(1)) * scale
+                else:
+                    raise ValueError(f"无法解析距离: {dist_str}")
+
+            with Session(engine) as session:
+                session.add(checkin)
+                session.commit()
+                session.refresh(checkin)
+            # return structured result for frontend
+            results.append({
+                "line": idx,
+                "user_id": checkin.user_id,
+                "record_id": checkin.id,
+                "date": checkin.date,
+                "distance": checkin.distance,
+                "message": f"打卡成功 user_id={checkin.user_id}"
+            })
+        except Exception as e:
+            errors.append(f"第{idx}行: 错误 {str(e)}")
+    return JSONResponse(content={"success": results, "error": errors})
+
+
+@app.get('/checkin_template')
+async def get_checkin_template():
+    """Return the CSV template file for batch checkin.
+
+    The file is expected to be at static/files/template_checkin.csv under the project root.
+    """
+    import os
+    # absolute path to the template file inside the mounted static directory
+    template_path = os.path.join(os.path.dirname(__file__), 'static', 'files', 'template_checkin.csv')
+    if not os.path.exists(template_path):
+        return JSONResponse(content={"error": "template not found"}, status_code=404)
+    # FileResponse will set appropriate headers for download
+    return FileResponse(template_path, media_type='text/csv', filename='template_checkin.csv')
 @app.post("/checkin", response_class=HTMLResponse)
 async def check_in(data: dict, request: Request)-> HTMLResponse:
     '''
     checkin api
     will parse the distance if not float, support format same as: 5.08km 5.08公里 21.095千米 5000m 5000米 3.1英里 3.5mile 3.8miles
-    data: {"message_id": 123456, "user_id": 123456, "order": "打卡 10", "distance": 5.08}
+    data: {"message_id": 123456, "user_id": 123456, "order": "打卡 10km", "distance": 5.08}
     '''
     error = None
     message = None
