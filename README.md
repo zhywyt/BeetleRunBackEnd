@@ -1,7 +1,7 @@
 # BeetleRunBackEnd 
 ## Quick Start
 ```bash
-pip install fastapi sqlmodel
+pip install fastapi sqlmodel uvicorn jinja2 python-multipart 
 ./start.sh
 ```
 
