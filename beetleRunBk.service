@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root/beetleRunBk
-ExecStart=/bin/bash /root/beetleRunBk/start.sh
+WorkingDirectory=/home/beetlerun/BeetleRunBackEnd
+ExecStart=/bin/bash /home/beetlerun/BeetleRunBackEnd/start.sh
 Restart=on-failure
-User=root
+User=beetlerun
 
 [Install]
 WantedBy=multi-user.target

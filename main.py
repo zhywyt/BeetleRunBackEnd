@@ -23,7 +23,7 @@ async def lifespan(app):
     yield
 
 app = FastAPI(lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="/root/beetleRunBk/static"), name="static")
+app.mount("/static", StaticFiles(directory="/home/beetlerun/BeetleRunBackEnd/static"), name="static")
 engine = create_engine("sqlite:///test.db")
 templates = Jinja2Templates(directory="templates")
 date_format = "%Y-%m-%d %H:%M:%S"
