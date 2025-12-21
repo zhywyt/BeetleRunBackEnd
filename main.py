@@ -437,9 +437,9 @@ async def check_in(data: dict, request: Request)-> HTMLResponse:
             "error": f"{checkin.user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。",
             "solve_time": (datetime.now() - start_time).total_seconds(),
         })
-    # check the date if is not UTC+8, convert it to UTC+8
+    # This server is UTC+8, then you need not add 8 hours. # check the date if is not UTC+8, convert it to UTC+8
     dt = datetime.strptime(checkin.date, date_format)
-    dt = dt + timedelta(hours=8)
+    # dt = dt + timedelta(hours=8)
     checkin.date = dt.strftime(date_format)
     # 检查今天是否打过卡了
     checked_users = get_today_checkin_users()
