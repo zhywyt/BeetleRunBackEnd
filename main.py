@@ -981,3 +981,121 @@ async def year_summary(data: dict, request: Request):
             "monthly_distance": monthly_distance,
             "solve_time": (datetime.now() - start_time).total_seconds(),
         })
+
+
+@app.post("/year_summary_all")
+async def year_summary_all(data: dict, request: Request):
+    '''
+    year summary for all users
+    data: {"year": 2023}
+    返回 JSON 格式的全体成员年度汇总统计
+    '''
+    year = data.get("year")
+    start_time = datetime.now()
+    try:
+        year = int(year)
+    except:
+        year = datetime.now().year
+
+    with Session(engine) as session:
+        statement = select(CheckIn).where(
+            (CheckIn.date >= f"{year}-01-01 00:00:00") &
+            (CheckIn.date <= f"{year}-12-31 23:59:59")
+        )
+        results = session.exec(statement)
+        checkins = results.all()
+        if not checkins:
+            return JSONResponse(content={"error": f"{year} 年没有打卡记录。"}, status_code=404)
+
+        total_checkins = len(checkins)
+        total_distance = sum(c.distance for c in checkins)
+
+        distance_ranges = {"0~5km": 0, "5~10km": 0, "10~21km": 0, "21km以上": 0}
+        for c in checkins:
+            if c.distance < 5:
+                distance_ranges["0~5km"] += 1
+            elif c.distance < 10:
+                distance_ranges["5~10km"] += 1
+            elif c.distance < 21:
+                distance_ranges["10~21km"] += 1
+            else:
+                distance_ranges["21km以上"] += 1
+        most_common_range = max(distance_ranges, key=distance_ranges.get)
+
+        # 计算每个用户最长连续打卡天数，取最大
+        from collections import defaultdict
+        user_dates = defaultdict(set)
+        for c in checkins:
+            user_dates[c.user_id].add(datetime.strptime(c.date, date_format).date())
+        longest_streak = 0
+        for uid, dateset in user_dates.items():
+            dates = sorted(dateset)
+            if not dates:
+                continue
+            current = 1
+            local_max = 1
+            for i in range(1, len(dates)):
+                if (dates[i] - dates[i-1]).days == 1:
+                    current += 1
+                else:
+                    local_max = max(local_max, current)
+                    current = 1
+            local_max = max(local_max, current)
+            longest_streak = max(longest_streak, local_max)
+
+        max_distance = max(c.distance for c in checkins)
+
+        month_count = {}
+        weekday_count = {}
+        time_distribution = {"早晨(5-8点)": 0, "上午(8-12点)": 0, "下午(12-18点)": 0, "晚上(18-22点)": 0, "深夜(22-5点)": 0}
+        monthly_distance = {m: 0 for m in range(1, 13)}
+        for c in checkins:
+            dt = datetime.strptime(c.date, date_format)
+            m = dt.month
+            month_count[m] = month_count.get(m, 0) + 1
+            wd = dt.weekday()
+            weekday_count[wd] = weekday_count.get(wd, 0) + 1
+            hour = dt.hour
+            if 5 <= hour < 8:
+                time_distribution["早晨(5-8点)"] += 1
+            elif 8 <= hour < 12:
+                time_distribution["上午(8-12点)"] += 1
+            elif 12 <= hour < 18:
+                time_distribution["下午(12-18点)"] += 1
+            elif 18 <= hour < 22:
+                time_distribution["晚上(18-22点)"] += 1
+            else:
+                time_distribution["深夜(22-5点)"] += 1
+            monthly_distance[m] += c.distance
+
+        most_active_month = max(month_count, key=month_count.get)
+        most_active_month_times = month_count[most_active_month]
+        most_active_weekday = max(weekday_count, key=weekday_count.get)
+        most_active_weekday_times = weekday_count[most_active_weekday]
+
+        # top users by total distance
+        user_dist = {}
+        for c in checkins:
+            user_dist[c.user_id] = user_dist.get(c.user_id, 0) + c.distance
+        top_users = sorted([{"user_id": uid, "total_distance": dist} for uid, dist in user_dist.items()], key=lambda x: x["total_distance"], reverse=True)[:10]
+
+        # 复用单用户的 HTML 模板进行渲染，user_id 使用 "all" 表示全体
+        return templates.TemplateResponse("year_summary.html", {
+            "request": request,
+            "user_id": "all",
+            "year": year,
+            "total_checkins": total_checkins,
+            "total_distance": total_distance,
+            "distance_ranges": distance_ranges,
+            "most_common_range": most_common_range,
+            "longest_streak": longest_streak,
+            "max_distance": max_distance,
+            "most_active_month": most_active_month,
+            "most_active_month_times": most_active_month_times,
+            "most_active_weekday": most_active_weekday,
+            "most_active_weekday_times": most_active_weekday_times,
+            "time_distribution": time_distribution,
+            "monthly_distance": monthly_distance,
+            "top_users": top_users,
+            "solve_time": (datetime.now() - start_time).total_seconds(),
+        })
