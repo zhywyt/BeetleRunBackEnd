@@ -835,3 +835,149 @@ async def archive_data(data: dict, request:Request):
             "backup_size": backup_size,
             "solve_time": (datetime.now() - start_time).total_seconds(),
         })
+'''
+年度总结
+1、打卡总次数
+2、打卡总距离
+3、0~5km、5~10km、10~21km、21km以上的打卡次数，最常跑的距离区间
+4、最长连续打卡天数
+5、最远单次打卡距离
+6、打卡最多的月份（打卡了多少次）
+7、打卡最多的星期几（打卡了多少次）
+8、打卡时间分布（早晨、上午、下午、晚上、深夜）
+9、每月距离
+'''
+@app.post("/year_summary", response_class=HTMLResponse)
+async def year_summary(data: dict, request: Request):
+    '''
+    year summary for user_id
+    data: {"user_id": 123456, "year": 2023}
+    '''
+    user_id = data.get("user_id")
+    year = data.get("year")
+    start_time = datetime.now()
+    if type(user_id) != int:
+        try:
+            user_id = int(user_id)
+        except:
+            user_id = None
+    if not user_id:
+        return templates.TemplateResponse("checkin_fail.html", {
+            "request": request,
+            "error": f"user_id is required.",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
+        })
+    if not is_binded(user_id):
+        return templates.TemplateResponse("checkin_fail.html", {
+            "request": request,
+            "error": f"{user_id} 还没有绑定，请使用 绑定 姓名 进行绑定。",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
+        })
+    try:
+        year = int(year)
+    except:
+        year = datetime.now().year
+    with Session(engine) as session:
+        statement = select(CheckIn).where(
+            (CheckIn.user_id == user_id) &
+            (CheckIn.date >= f"{year}-01-01 00:00:00") &
+            (CheckIn.date <= f"{year}-12-31 23:59:59")
+        )
+        results = session.exec(statement)
+        checkins = results.all()
+        if not checkins:
+            return templates.TemplateResponse("checkin_fail.html", {
+                "request": request,
+                "error": f"{year} 年没有打卡记录。",
+                "solve_time": (datetime.now() - start_time).total_seconds(),
+            })
+        # 计算各项数据
+        total_checkins = len(checkins)
+        total_distance = sum(c.distance for c in checkins)
+        # 距离区间统计
+        distance_ranges = {
+            "0~5km": 0,
+            "5~10km": 0,
+            "10~21km": 0,
+            "21km以上": 0
+        }
+        for c in checkins:
+            if c.distance < 5:
+                distance_ranges["0~5km"] += 1
+            elif c.distance < 10:
+                distance_ranges["5~10km"] += 1
+            elif c.distance < 21:
+                distance_ranges["10~21km"] += 1
+            else:
+                distance_ranges["21km以上"] += 1
+        most_common_range = max(distance_ranges, key=distance_ranges.get)
+        # 最长连续打卡天数
+        dates = sorted(set([datetime.strptime(c.date, date_format).date() for c in checkins]))
+        longest_streak = 0
+        current_streak = 1
+        for i in range(1, len(dates)):
+            if (dates[i] - dates[i-1]).days == 1:
+                current_streak += 1
+            else:
+                longest_streak = max(longest_streak, current_streak)
+                current_streak = 1
+        longest_streak = max(longest_streak, current_streak)
+        # 最远单次打卡距离
+        max_distance = max(c.distance for c in checkins)
+        # 打卡最多的月份
+        month_count = {}
+        for c in checkins:
+            month = datetime.strptime(c.date, date_format).month
+            month_count[month] = month_count.get(month, 0) + 1
+        most_active_month = max(month_count, key=month_count.get)
+        most_active_month_times = month_count[most_active_month]
+        # 打卡最多的星期几
+        weekday_count = {}
+        for c in checkins:
+            weekday = datetime.strptime(c.date, date_format).weekday()
+            weekday_count[weekday] = weekday_count.get(weekday, 0) + 1
+        most_active_weekday = max(weekday_count, key=weekday_count.get)
+        most_active_weekday_times = weekday_count[most_active_weekday]
+        # 打卡时间分布
+        time_distribution = {
+            "早晨(5-8点)": 0,
+            "上午(8-12点)": 0,
+            "下午(12-18点)": 0,
+            "晚上(18-22点)": 0,
+            "深夜(22-5点)": 0
+        }
+        for c in checkins:
+            hour = datetime.strptime(c.date, date_format).hour
+            if 5 <= hour < 8:
+                time_distribution["早晨(5-8点)"] += 1
+            elif 8 <= hour < 12:
+                time_distribution["上午(8-12点)"] += 1
+            elif 12 <= hour < 18:
+                time_distribution["下午(12-18点)"] += 1
+            elif 18 <= hour < 22:
+                time_distribution["晚上(18-22点)"] += 1
+            else:
+                time_distribution["深夜(22-5点)"] += 1
+        # 每月距离
+        monthly_distance = {m: 0 for m in range(1, 13)}
+        for c in checkins:
+            month = datetime.strptime(c.date, date_format).month
+            monthly_distance[month] += c.distance
+        return templates.TemplateResponse("year_summary.html", {
+            "request": request,
+            "user_id": user_id,
+            "year": year,
+            "total_checkins": total_checkins,
+            "total_distance": total_distance,
+            "distance_ranges": distance_ranges,
+            "most_common_range": most_common_range,
+            "longest_streak": longest_streak,
+            "max_distance": max_distance,
+            "most_active_month": most_active_month,
+            "most_active_month_times": most_active_month_times,
+            "most_active_weekday": most_active_weekday,
+            "most_active_weekday_times": most_active_weekday_times,
+            "time_distribution": time_distribution,
+            "monthly_distance": monthly_distance,
+            "solve_time": (datetime.now() - start_time).total_seconds(),
+        })

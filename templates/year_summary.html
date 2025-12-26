@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-cn">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width,initial-scale=1">
+		<title>年度总结 - {{ year }}</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+		<style>
+			:root{--bg:#f7fafc;--card:#ffffff;--muted:#6b7280;--accent:#2563eb;--glass:rgba(255,255,255,0.7)}
+			*{box-sizing:border-box}
+			body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background:var(--bg); color:#0f172a; margin:0;padding:24px}
+			.container{max-width:1100px;margin:0 auto}
+			header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+			h1{font-size:1.6rem;margin:0}
+			.controls{display:flex;gap:8px;align-items:center}
+			.card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(15,23,42,0.06);margin-bottom:16px}
+			.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+			.metric{padding:12px;border-radius:8px;background:linear-gradient(180deg,var(--glass),#fff);text-align:center}
+			.metric .label{font-size:0.85rem;color:var(--muted)}
+			.metric .value{font-size:1.3rem;font-weight:700;margin-top:6px}
+			.two-col{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+			canvas{width:100%!important;height:260px!important}
+			table{width:100%;border-collapse:collapse}
+			th,td{padding:10px;border-bottom:1px solid #f1f5f9;text-align:left}
+			.muted{color:var(--muted)}
+			@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)} .two-col{grid-template-columns:1fr} canvas{height:220px!important}}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<header>
+				<h1>年度总结</h1>
+				<div class="controls">
+					<form id="queryForm" onsubmit="return submitForm(event)" style="display:flex;gap:8px;align-items:center">
+						<input id="user_id" name="user_id" type="number" value="{{ user_id }}" required style="padding:8px;border-radius:8px;border:1px solid #e6edf3">
+						<input id="year" name="year" type="number" value="{{ year }}" required style="width:100px;padding:8px;border-radius:8px;border:1px solid #e6edf3">
+						<button type="submit" style="padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#fff">查看</button>
+					</form>
+				</div>
+			</header>
+
+			<div class="card">
+				<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+					<div>
+						<div class="muted">用户</div>
+						<div style="font-weight:700;font-size:1.1rem">{{ user_id or '—' }}</div>
+						<div class="muted" style="margin-top:6px">年度：<strong>{{ year }}</strong></div>
+					</div>
+					<div style="flex:1"></div>
+					<div class="muted">渲染耗时：{{ '%.3f'|format(solve_time) }} 秒</div>
+				</div>
+			</div>
+
+			<div class="card">
+				<h3 style="margin-top:0">每月距离 (km)</h3>
+				<svg id="monthlyChart" viewBox="0 0 600 260" width="100%" height="220" role="img" aria-label="每月距离分布"></svg>
+			</div>
+
+			<div class="grid">
+				<div class="card metric">
+					<div class="label">总打卡次数</div>
+					<div class="value">{{ total_checkins }}</div>
+				</div>
+				<div class="card metric">
+					<div class="label">总距离 (km)</div>
+					<div class="value">{{ '%.2f'|format(total_distance) }}</div>
+				</div>
+				<div class="card metric">
+					<div class="label">最长连续天数</div>
+					<div class="value">{{ longest_streak }}</div>
+				</div>
+				<div class="card metric">
+					<div class="label">最大单次距离 (km)</div>
+					<div class="value">{{ '%.2f'|format(max_distance) }}</div>
+				</div>
+			</div>
+
+			<div class="two-col">
+				<div class="card">
+					<h3 style="margin-top:0">距离区间分布</h3>
+					    <div class="muted">最常跑区间： <strong>{{ most_common_range }}</strong></div>
+				</div>
+				<div class="card">
+					<h3 style="margin-top:0">时间段分布</h3>
+					<div style="margin-top:12px">
+						<div class="muted" style="margin-top:8px">最活跃月份： <strong>{{ most_active_month }}</strong></div>
+						<div class="muted" style="margin-top:4px">最活跃星期： <strong>{{ most_active_weekday }}</strong></div>
+					</div>
+				</div>
+			</div>
+
+			<div class="card">
+				<h3 style="margin-top:0">明细（时间段与区间）</h3>
+				<div style="display:flex;gap:12px;flex-wrap:wrap">
+					<div style="flex:1;min-width:260px">
+						<h4 style="margin:8px 0">距离区间</h4>
+					<svg id="distanceChart" viewBox="0 0 300 300" width="100%" height="260" role="img" aria-label="距离区间分布"></svg>
+					</div>
+					<div style="flex:1;min-width:260px">
+						<h4 style="margin:8px 0">时间分布</h4>
+					    <svg id="timeChart" viewBox="0 0 300 300" width="100%" height="260" role="img" aria-label="时间段分布"></svg>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script>
+			// build JS arrays from Jinja variables
+			const distanceLabels = [{% for k in distance_ranges.keys() %}"{{ k }}"{% if not loop.last %}, {% endif %}{% endfor %}];
+			const distanceValues = [{% for v in distance_ranges.values() %}{{ v }}{% if not loop.last %}, {% endif %}{% endfor %}];
+			const timeLabels = [{% for k in time_distribution.keys() %}"{{ k }}"{% if not loop.last %}, {% endif %}{% endfor %}];
+			const timeValues = [{% for v in time_distribution.values() %}{{ v }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
+			const palette = ['#60a5fa','#7dd3fc','#34d399','#fca5a5','#fbcfe8','#2563eb','#a78bfa','#f59e0b'];
+
+			function drawPie(svgId, labels, values, colors, options={}){
+				const svg = document.getElementById(svgId);
+				while(svg.firstChild) svg.removeChild(svg.firstChild);
+				const box = 300;
+				let cx = box/2, cy = box/2, r = 120;
+				const total = values.reduce((a,b)=>a+Number(b||0),0) || 1;
+				let start = -Math.PI/2;
+				// legend positioning: default right, allow left via options.legend === 'left'
+				let legendX;
+				const legendYStart = 36;
+				const legendGap = 18;
+				if(options.legend === 'left'){
+					legendX = 10; // left padding for legend
+					cx = box - 100; // shift pie to the right to make room
+					r = 90; // reduce radius to fit
+				}else{
+					legendX = box - 120; // right-side legend
+				}
+				for(let i=0;i<values.length;i++){
+					const v = Number(values[i]) || 0;
+					if(v<=0){ start += 0; continue; }
+					const angle = v/total*2*Math.PI;
+					const end = start + angle;
+					const x1 = cx + r*Math.cos(start);
+					const y1 = cy + r*Math.sin(start);
+					const x2 = cx + r*Math.cos(end);
+					const y2 = cy + r*Math.sin(end);
+					const large = angle > Math.PI ? 1:0;
+					const d = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+					const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+					path.setAttribute('d', d);
+					path.setAttribute('fill', colors[i%colors.length]);
+					svg.appendChild(path);
+					start = end;
+				}
+				if(options.doughnut){
+					const hole = document.createElementNS('http://www.w3.org/2000/svg','circle');
+					hole.setAttribute('cx',cx);
+					hole.setAttribute('cy',cy);
+					hole.setAttribute('r', options.holeRadius || 60);
+					hole.setAttribute('fill', options.holeColor || '#fff');
+					svg.appendChild(hole);
+				}
+				// legend: place to configured side and align text vertically
+				for(let i=0;i<labels.length;i++){
+					const gY = legendYStart + i*legendGap;
+					const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+					rect.setAttribute('x', legendX);
+					rect.setAttribute('y', gY-8);
+					rect.setAttribute('width',12);
+					rect.setAttribute('height',12);
+					rect.setAttribute('fill', colors[i%colors.length]);
+					svg.appendChild(rect);
+					const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+					text.setAttribute('x', legendX+18);
+					text.setAttribute('y', gY);
+					text.setAttribute('font-size', '12');
+					text.setAttribute('fill', '#0f172a');
+					text.setAttribute('dominant-baseline', 'middle');
+					text.textContent = labels[i] + ' (' + values[i] + ')';
+					svg.appendChild(text);
+				}
+			}
+
+			// draw charts: pies and monthly bar chart
+			drawPie('distanceChart', distanceLabels, distanceValues, palette, {doughnut:false, legend:'left'});
+			drawPie('timeChart', timeLabels, timeValues, ['#60a5fa','#7dd3fc','#34d399','#fca5a5','#fbcfe8'], {doughnut:true, holeRadius:60, holeColor:'#fff', legend:'left'});
+
+			// monthly distance arrays from Jinja
+			const monthLabels = [{% for m in monthly_distance.keys() %}"{{ m }}月"{% if not loop.last %}, {% endif %}{% endfor %}];
+			const monthValues = [{% for v in monthly_distance.values() %}{{ v }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
+			function drawBar(svgId, labels, values, options={}){
+				const svg = document.getElementById(svgId);
+				while(svg.firstChild) svg.removeChild(svg.firstChild);
+				const boxW = 600, boxH = 220;
+				const padding = 40;
+				const innerW = boxW - padding*2;
+				const maxVal = Math.max(...values.map(v=>Number(v||0)), 1);
+				const barCount = labels.length || 1;
+				const barW = Math.max(6, innerW / barCount * 0.7);
+				const gap = (innerW - barW*barCount) / Math.max(1, barCount-1);
+				// draw baseline
+				const baseline = boxH - 30;
+				const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+				line.setAttribute('x1', padding);
+				line.setAttribute('y1', baseline);
+				line.setAttribute('x2', boxW - padding);
+				line.setAttribute('y2', baseline);
+				line.setAttribute('stroke', '#e6edf3');
+				svg.appendChild(line);
+				for(let i=0;i<labels.length;i++){
+					const v = Number(values[i]) || 0;
+					const h = (v / maxVal) * (baseline - 20);
+					const x = padding + i*(barW + gap);
+					const y = baseline - h;
+					const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+					rect.setAttribute('x', x);
+					rect.setAttribute('y', y);
+					rect.setAttribute('width', barW);
+					rect.setAttribute('height', Math.max(2, h));
+					rect.setAttribute('fill', options.barColor || '#2563eb');
+					svg.appendChild(rect);
+					// value label above bar
+					const vtext = document.createElementNS('http://www.w3.org/2000/svg','text');
+					vtext.setAttribute('x', x + barW/2);
+					vtext.setAttribute('y', y - 6);
+					vtext.setAttribute('font-size','11');
+					vtext.setAttribute('fill','#0f172a');
+					vtext.setAttribute('text-anchor','middle');
+					vtext.textContent = v.toFixed(1);
+					svg.appendChild(vtext);
+					// month label
+					const ltext = document.createElementNS('http://www.w3.org/2000/svg','text');
+					ltext.setAttribute('x', x + barW/2);
+					ltext.setAttribute('y', baseline + 14);
+					ltext.setAttribute('font-size','11');
+					ltext.setAttribute('fill','#6b7280');
+					ltext.setAttribute('text-anchor','middle');
+					ltext.textContent = labels[i];
+					svg.appendChild(ltext);
+				}
+			}
+
+			drawBar('monthlyChart', monthLabels, monthValues, {barColor:'#2563eb'});
+
+			async function submitForm(e){
+				e.preventDefault();
+				const uid = document.getElementById('user_id').value;
+				const year = document.getElementById('year').value;
+				try{
+					const resp = await fetch('/year_summary',{
+						method:'POST',headers:{'Content-Type':'application/json'},
+						body: JSON.stringify({user_id: Number(uid), year: Number(year)})
+					});
+					const text = await resp.text();
+					document.open(); document.write(text); document.close();
+				}catch(err){alert('请求失败: '+err)}
+				return false;
+			}
+		</script>
+	</body>
+</html>
+
