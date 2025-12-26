@@ -791,8 +791,11 @@ def backup_data_(request: Request, backup_name=None):
     if backup_name == None:
         backup_name = timestamp
     backup_file = os.path.join(backup_dir, f"backup_{backup_name}.db")
+    # get backup file size
+    backup_size = 0
     shutil.copy("test.db", backup_file)
-    return backup_file
+    backup_size = os.path.getsize(backup_file)
+    return backup_file, backup_size
 
 @app.post("/backup", response_class=HTMLResponse)
 async def backup_data(data: dict, request: Request):
@@ -801,11 +804,12 @@ async def backup_data(data: dict, request: Request):
     '''
     start_time = datetime.now()
     backup_name = data.get("backup_name", None)
-    backup_file = backup_data_(request, backup_name)
+    backup_file, backup_size = backup_data_(request, backup_name)
     return templates.TemplateResponse("backup_success.html", {
         "request": request,
         "backup_file": backup_file,
         "message": f"数据库已备份到 {backup_file}。",
+        "backup_size": backup_size,
         "solve_time": (datetime.now() - start_time).total_seconds(),
     })
     
@@ -819,7 +823,7 @@ async def archive_data(data: dict, request:Request):
     start_time = datetime.now()
     from sqlmodel import text
     backup_name = data.get("backup_name", None)
-    backup_file = backup_data_(request, backup_name)
+    backup_file, backup_size = backup_data_(request, backup_name)
     with Session(engine) as session:
         sql = 'DELETE FROM checkin'
         session.exec(text(sql))
@@ -828,5 +832,6 @@ async def archive_data(data: dict, request:Request):
             "request": request,
             "backup_file": backup_file,
             "message": f"数据库已备份到 {backup_file}，并清空了打卡记录。",
+            "backup_size": backup_size,
             "solve_time": (datetime.now() - start_time).total_seconds(),
         })

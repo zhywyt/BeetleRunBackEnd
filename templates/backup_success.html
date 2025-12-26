@@ -59,6 +59,7 @@
     <div class="card">
         <div class="success">备份成功！</div>
         <div class="info">{% if message %}{{message}}{% endif %}</div>
+        <div class="info">{% if backup_size %}备份文件大小：{{"%.2f"|format(backup_size / 1024)}} KB{% endif %}</div>
         {% if solve_time %}
         <tr>
             <td colspan="5" style="text-align:right;font-size:0.8em;color:#888;">
