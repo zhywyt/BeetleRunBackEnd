@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import re
 from datetime import datetime, timedelta
+from collections import OrderedDict
 from fastapi.staticfiles import StaticFiles
 
 
@@ -963,9 +964,18 @@ async def year_summary(data: dict, request: Request):
         for c in checkins:
             month = datetime.strptime(c.date, date_format).month
             monthly_distance[month] += c.distance
+        # 每日打卡距离统计（用于日历热力图），按日期字符串有序返回，单位：公里
+        daily_counts = {}
+        for c in checkins:
+            d = datetime.strptime(c.date, date_format).date().isoformat()
+            # 累加当天的总距离
+            daily_counts[d] = round(daily_counts.get(d, 0) + float(c.distance), 3)
+        # 保证按日期升序
+        daily_counts = OrderedDict(sorted(daily_counts.items(), key=lambda x: x[0]))
+        name = session.exec(select(User).where(User.user_id == user_id)).first().name
         return templates.TemplateResponse("year_summary.html", {
             "request": request,
-            "user_id": user_id,
+            "name": name,
             "year": year,
             "total_checkins": total_checkins,
             "total_distance": total_distance,
@@ -979,6 +989,7 @@ async def year_summary(data: dict, request: Request):
             "most_active_weekday_times": most_active_weekday_times,
             "time_distribution": time_distribution,
             "monthly_distance": monthly_distance,
+            "daily_counts": daily_counts,
             "solve_time": (datetime.now() - start_time).total_seconds(),
         })
 
@@ -1079,10 +1090,18 @@ async def year_summary_all(data: dict, request: Request):
             user_dist[c.user_id] = user_dist.get(c.user_id, 0) + c.distance
         top_users = sorted([{"user_id": uid, "total_distance": dist} for uid, dist in user_dist.items()], key=lambda x: x["total_distance"], reverse=True)[:10]
 
-        # 复用单用户的 HTML 模板进行渲染，user_id 使用 "all" 表示全体
+        # 每日打卡距离统计（用于日历热力图），按日期字符串有序返回，单位：公里
+        daily_counts = {}
+        for c in checkins:
+            d = datetime.strptime(c.date, date_format).date().isoformat()
+            # 累加当天的总距离
+            daily_counts[d] = round(daily_counts.get(d, 0) + float(c.distance), 3)
+        # 保证按日期升序
+        daily_counts = OrderedDict(sorted(daily_counts.items(), key=lambda x: x[0]))
+        name = "全体成员"
         return templates.TemplateResponse("year_summary.html", {
             "request": request,
-            "user_id": "all",
+            "name": name,
             "year": year,
             "total_checkins": total_checkins,
             "total_distance": total_distance,
@@ -1097,5 +1116,6 @@ async def year_summary_all(data: dict, request: Request):
             "time_distribution": time_distribution,
             "monthly_distance": monthly_distance,
             "top_users": top_users,
+            "daily_counts": daily_counts,
             "solve_time": (datetime.now() - start_time).total_seconds(),
         })
