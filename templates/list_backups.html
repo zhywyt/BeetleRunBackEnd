@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>数据库备份列表</title>
+  <style>
+    body{font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial;margin:24px}
+    table{border-collapse:collapse;width:100%}
+    th,td{padding:8px;border:1px solid #ddd;text-align:left}
+    th{background:#f6f6f6}
+    .small{color:#666;font-size:0.9em}
+  </style>
+</head>
+<body>
+  <h1>数据库备份</h1>
+  <p class="small">备份目录: backups</p>
+  {% if backup_files and backup_files|length > 0 %}
+  <table>
+    <thead>
+      <tr>
+        <th>文件名</th>
+        <th>大小 (字节)</th>
+        <th>路径</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in backup_files %}
+      <tr>
+        <td>{{ f.file_name }}</td>
+        <td>{{ f.file_size }}</td>
+        <td class="small">{{ f.file_path }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>未发现备份文件。</p>
+  {% endif %}
+  <p style="margin-top:18px;"><a href="/">返回首页</a></p>
+</body>
+</html>

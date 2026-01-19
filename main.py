@@ -16,6 +16,7 @@ import re
 from datetime import datetime, timedelta
 from collections import OrderedDict
 from fastapi.staticfiles import StaticFiles
+import os
 
 
 @asynccontextmanager
@@ -23,9 +24,15 @@ async def lifespan(app):
     SQLModel.metadata.create_all(engine)
     yield
 
+BACKUP_DIR = "backups"
+ARCHIVE_DIR = "archives"
+DATABASE_FILE = "test.db"
+# current path by dynamic
+PWD = os.path.abspath(os.path.dirname(__file__))
+STATIC_PATH = PWD + "/static"
 app = FastAPI(lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="/home/beetlerun/BeetleRunBackEnd/static"), name="static")
-engine = create_engine("sqlite:///test.db")
+app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
+engine = create_engine("sqlite:///" + DATABASE_FILE)
 templates = Jinja2Templates(directory="templates")
 date_format = "%Y-%m-%d %H:%M:%S"
 class User(SQLModel, table=True):
@@ -121,7 +128,20 @@ def is_binded(user_id: int)->bool:
         results = session.exec(statement)
         user = results.first()
         return user is not None
-
+def reload_database():
+    '''
+    reload the database from file
+    '''
+    global engine
+    try:
+        # dispose existing connections/pool to release file locks
+        engine.dispose()
+    except Exception:
+        pass
+    # recreate engine pointing to the configured database file
+    engine = create_engine("sqlite:///" + DATABASE_FILE, connect_args={"check_same_thread": False})
+    # ensure metadata exists on the new engine
+    SQLModel.metadata.create_all(engine)
 @app.post("/web")
 async def web_query(data: dict):
     '''
@@ -779,13 +799,12 @@ async def erase_checkinfo(data: dict):
         session.commit()
         return JSONResponse(content={"message": f"Record with id {record_id} deleted successfully."})
         
-def backup_data_(request: Request, backup_name=None):
+def save_data_base_(request: Request, backup_name=None, backup_dir="backups"):
     '''
     only backup data do not clear checkin table
     '''
     import os
     import shutil
-    backup_dir = "backups"
     os.makedirs(backup_dir, exist_ok=True)
     # there is not parse checkin.date need not date_format var
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -797,7 +816,40 @@ def backup_data_(request: Request, backup_name=None):
     shutil.copy("test.db", backup_file)
     backup_size = os.path.getsize(backup_file)
     return backup_file, backup_size
-
+def load_data_base_(request: Request, backup_name, backup_dir="backups"):
+    '''
+    load the backup database file
+    '''
+    import shutil
+    start_time = datetime.now()
+    backup_file = os.path.join(backup_dir, backup_name)
+    if not backup_file:
+        return templates.TemplateResponse("checkin/checkin_fail.html", {
+            "request": request,
+            "error": f"backup_file is required.",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
+        })
+    if not os.path.exists(backup_file):
+        return templates.TemplateResponse("checkin/checkin_fail.html", {
+            "request": request,
+            "error": f"backup_file {backup_file} does not exist.",
+            "solve_time": (datetime.now() - start_time).total_seconds(),
+        })
+    # dispose engine first to release any open connections to the DB file
+    try:
+        engine.dispose()
+    except Exception:
+        pass
+    # copy backup file to database file
+    shutil.copy(backup_file, DATABASE_FILE)
+    # recreate engine / reload metadata
+    reload_database()
+    return templates.TemplateResponse("load_backup_success.html", {
+        "request": request,
+        "backup_file": backup_file,
+        "message": f"已从 {backup_file} 恢复数据库。",
+        "solve_time": (datetime.now() - start_time).total_seconds(),
+    })
 @app.post("/backup", response_class=HTMLResponse)
 async def backup_data(data: dict, request: Request):
     '''
@@ -805,7 +857,7 @@ async def backup_data(data: dict, request: Request):
     '''
     start_time = datetime.now()
     backup_name = data.get("backup_name", None)
-    backup_file, backup_size = backup_data_(request, backup_name)
+    backup_file, backup_size = save_data_base_(request, backup_name, BACKUP_DIR)
     return templates.TemplateResponse("backup_success.html", {
         "request": request,
         "backup_file": backup_file,
@@ -824,7 +876,7 @@ async def archive_data(data: dict, request:Request):
     start_time = datetime.now()
     from sqlmodel import text
     backup_name = data.get("backup_name", None)
-    backup_file, backup_size = backup_data_(request, backup_name)
+    backup_file, backup_size = save_data_base_(request, backup_name, ARCHIVE_DIR)
     with Session(engine) as session:
         sql = 'DELETE FROM checkin'
         session.exec(text(sql))
@@ -836,6 +888,70 @@ async def archive_data(data: dict, request:Request):
             "backup_size": backup_size,
             "solve_time": (datetime.now() - start_time).total_seconds(),
         })
+@app.get("/list_backups", response_class=HTMLResponse)
+async def list_backups(request: Request):
+    '''
+    list all backup files
+    '''
+    import os
+    backup_dir = BACKUP_DIR
+    os.makedirs(backup_dir, exist_ok=True)
+    files = os.listdir(backup_dir)
+    backup_files = []
+    for f in files:
+        if f.startswith("backup_") and f.endswith(".db"):
+            file_path = os.path.join(backup_dir, f)
+            file_size = os.path.getsize(file_path)
+            backup_files.append({
+                "file_name": f,
+                "file_path": file_path,
+                "file_size": file_size,
+            })
+    return templates.TemplateResponse("list_backups.html", {
+        "request": request,
+        "backup_files": backup_files,
+    })
+@app.get("/list_archives", response_class=HTMLResponse)
+async def list_archives(request: Request):
+    '''
+    list all archive files
+    '''
+    import os
+    archive_dir = ARCHIVE_DIR
+    os.makedirs(archive_dir, exist_ok=True)
+    files = os.listdir(archive_dir)
+    archive_files = []
+    for f in files:
+        if f.startswith("backup_") and f.endswith(".db"):
+            file_path = os.path.join(archive_dir, f)
+            file_size = os.path.getsize(file_path)
+            archive_files.append({
+                "file_name": f,
+                "file_path": file_path,
+                "file_size": file_size,
+            })
+    return templates.TemplateResponse("list_archives.html", {
+        "request": request,
+        "archive_files": archive_files,
+    })
+@app.post("/load_backup", response_class=HTMLResponse)
+async def load_backup(data: dict, request: Request):
+    '''
+    load backup database file
+    data: {"backup_file": "backup_20230101_120000.db"}
+    '''
+    backup_name = data.get("backup_file")
+    return load_data_base_(request, backup_name, BACKUP_DIR)
+@app.post("/load_archive", response_class=HTMLResponse)
+async def load_archive(data: dict, request: Request):
+    '''
+    load archive database file
+    data: {"archive_file": "backup_20230101_120000.db"}
+    '''
+    import os
+    import shutil
+    archive_file = data.get("archive_file")
+    return load_data_base_(request, archive_file, ARCHIVE_DIR)
 '''
 年度总结
 1、打卡总次数
